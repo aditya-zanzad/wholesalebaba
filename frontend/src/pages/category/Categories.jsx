@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, Settings, LogOut, User, Menu } from "lucide-react";
 import shirt from "../../assets/shirt.png";
 import kurta from "../../assets/kurta.png";
-import ModiJacket from "../../assets/ModiJacket.png";
+import ModiJacket from "../../assets/jacket.png";
 import endowestern from "../../assets/endowestern.png";
 import logo1 from "../../assets/logo1.png";
 import axios from "axios";
