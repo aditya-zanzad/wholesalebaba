@@ -27,7 +27,7 @@ const featuresData = [
 const FeatureCard = ({ icon, title, content, bg }) => (
   <div className={`p-6 lg:p-8 rounded-2xl hover:shadow-md transition-transform duration-300 transform hover:-translate-y-1 ${bg}`}>
     <div className="w-14 h-14 flex items-center justify-center mb-5">{icon}</div>
-    <h3 className="text-2xl font-semibold text-taupe-900 mb-3">{title}</h3>
+    <h3 className="text-xl md:text-2xl font-semibold text-taupe-900 mb-3">{title}</h3>
     <p className="text-taupe-600 text-base">{content}</p>
   </div>
 );
@@ -75,7 +75,7 @@ const Home = () => {
         </div>
         {isMenuOpen && (
           <div className="absolute w-full bg-white py-6 px-4 space-y-4 animate-slide-down">
-            <Link to="/login" className="block px-4 py-3 text-ivory-50 hover:bg-taupe-800 rounded-lg text-lg">
+            <Link to="/login" className="block px-4 py-3 text-taupe-900 hover:bg-taupe-100 rounded-lg text-lg">
               Login
             </Link>
             <Link
@@ -111,67 +111,32 @@ const Home = () => {
       {/* Hero Section */}
       <section className="pt-28 lg:pt-40 pb-16 lg:pb-24 px-4 lg:px-6 text-center bg-gradient-to-b from-taupe-50 to-ivory-50">
         <div className="max-w-5xl mx-auto overflow-hidden">
-        <div>
-    {/* First h1 with fade-in and slide-up animation */}
-    <h1 className="text-3xl lg:text-6xl font-extrabold text-gray-500 mb-6 tracking-wide whitespace-nowrap animate-fade-slide-up">
-      MANUFACTURER TO RETAILER
-    </h1>
-    {/* Second h1 with typewriter animation */}
-    <h1 className="text-4xl lg:text-7xl font-bold text-taupe-900 mb-6 tracking-wide whitespace-nowrap animate-typewriter">
-      {heroText}
-    </h1>
-
-    {/* Inline CSS for custom animations */}
-    <style>
-      {`
-        /* Fade-in and slide-up animation */
-        @keyframes fadeSlideUp {
-          0% {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fade-slide-up {
-          animation: fadeSlideUp 1.5s ease-out forwards;
-        }
-
-        /* Typewriter animation */
-        @keyframes typewriter {
-          from {
-            width: 0;
-          }
-          to {
-            width: 100%;
-          }
-        }
-        .animate-typewriter {
-          overflow: hidden;
-          white-space: nowrap;
-          animation: typewriter 3s steps(20, end) forwards;
-        }
-      `}
-    </style>
-  </div>
-          <p className="text-xl lg:text-2xl text-taupe-600 mb-10 max-w-3xl mx-auto animate-marquee whitespace-nowrap">
+          <div>
+            {/* First h1 - now properly responsive */}
+            <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-extrabold text-gray-500 mb-3 sm:mb-4 md:mb-5 lg:mb-6 tracking-tight">
+              MANUFACTURER TO RETAILER
+            </h1>
+            {/* Second h1 - now properly responsive */}
+            <h1 className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-6xl xl:text-7xl font-bold text-taupe-900 mb-4 sm:mb-5 md:mb-6 lg:mb-7 tracking-tight leading-tight">
+              {heroText}
+            </h1>
+          </div>
+          <p className="text-base xs:text-lg sm:text-xl md:text-xl lg:text-2xl text-taupe-600 mb-6 sm:mb-8 lg:mb-10 max-w-3xl mx-auto">
             {heroSubtitle}
           </p>
           <Link
             to="/register"
-            className="inline-flex items-center gap-3 bg-amber-100 text-ivory-50 px-8 py-4 rounded-full text-lg font-semibold hover:bg-coral-600 transition-all duration-300 shadow-lg"
+            className="inline-flex items-center gap-2 sm:gap-3 bg-coral-500 text-ivory-50 px-5 py-2 sm:px-6 sm:py-3 md:px-7 md:py-3 lg:px-8 lg:py-4 rounded-full text-sm sm:text-base md:text-lg font-semibold hover:bg-coral-600 transition-all duration-300 shadow-lg"
           >
-            <ShoppingBag className="w-6 h-6" />
+            <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6" />
             Shop Now
           </Link>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-16 lg:py-24 bg-ivory-200">
-        <div className="max-w-7xl mx-auto px-4 lg:px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+      <section className="py-12 sm:py-16 lg:py-24 bg-ivory-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
           {featuresData.map((feature, index) => (
             <FeatureCard key={index} {...feature} />
           ))}
@@ -179,24 +144,24 @@ const Home = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 lg:py-24 text-center bg-rose-gold-50">
-        <div className="max-w-4xl mx-auto px-4 lg:px-6">
-          <h2 className="text-4xl lg:text-5xl font-bold text-taupe-900 mb-6 tracking-wide">
+      <section className="py-12 sm:py-16 lg:py-24 text-center bg-rose-gold-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl xs:text-4xl sm:text-5xl lg:text-5xl font-bold text-taupe-900 mb-4 sm:mb-5 lg:mb-6 tracking-tight">
             Elevate Your Wardrobe
           </h2>
-          <p className="text-lg lg:text-xl text-taupe-600 mb-10">
+          <p className="text-base sm:text-lg lg:text-xl text-taupe-600 mb-6 sm:mb-8 lg:mb-10 max-w-2xl mx-auto">
             Join now for exclusive access to curated fashion and special offers.
           </p>
-          <div className="flex flex-col lg:flex-row justify-center gap-6">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4 lg:gap-6">
             <Link
               to="/register"
-              className="px-8 py-4 bg-coral-500 text-ivory-50 rounded-full font-semibold hover:bg-coral-600 transition-all duration-300 shadow-md"
+              className="px-5 py-2 sm:px-6 sm:py-3 lg:px-8 lg:py-4 bg-coral-500 text-ivory-50 rounded-full text-sm sm:text-base lg:text-lg font-semibold hover:bg-coral-600 transition-all duration-300 shadow-md"
             >
               Get Started
             </Link>
             <Link
               to="/categories"
-              className="px-8 py-4 border-2 border-taupe-300 text-taupe-700 rounded-full font-semibold hover:border-coral-500 hover:text-coral-500 transition-all duration-300"
+              className="px-5 py-2 sm:px-6 sm:py-3 lg:px-8 lg:py-4 border-2 border-taupe-300 text-taupe-700 rounded-full text-sm sm:text-base lg:text-lg font-semibold hover:border-coral-500 hover:text-coral-500 transition-all duration-300"
             >
               Explore Collections
             </Link>
@@ -205,26 +170,9 @@ const Home = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-taupe-900 py-8 text-center text-ivory-50">
+      <footer className="bg-taupe-900 py-6 sm:py-8 text-center text-ivory-50 text-sm sm:text-base">
         © 2025 FashionReels. All rights reserved.
       </footer>
-
-      {/* Inline CSS for Marquee Animation */}
-      <style>
-        {`
-          @keyframes marquee {
-            0% {
-              transform: translateX(-100%);
-            }
-            100% {
-              transform: translateX(100%);
-            }
-          }
-          .animate-marquee {
-            animation: marquee 10s linear infinite;
-          }
-        `}
-      </style>
     </div>
   );
 };
