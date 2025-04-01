@@ -24,6 +24,7 @@ import MenPage from "../pages/category/Menpage";
 import  Query  from "../admin/pages/querybox/Query";
 import Hometext from "../admin/pages/Hometext";
 import AdminAddCategory from "../admin/pages/AdminAddCategory";
+import CategoryEnable from "../admin/pages/Categoryenable";
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -136,6 +137,13 @@ const AppRoutes = () => {
         element={
           <AdminRoute>
             <AdminAddCategory />
+          </AdminRoute>
+        }></Route>
+        <Route
+        path="/admin/categoryenable"
+        element={
+          <AdminRoute>
+            <CategoryEnable/>
           </AdminRoute>
         }
       />

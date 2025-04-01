@@ -1,19 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, Settings, LogOut, User, Menu } from "lucide-react";
-import shirt from "../../assets/shirt.png";
-import kurta from "../../assets/kurta.png";
-import ModiJacket from "../../assets/jacket.png";
-import endowestern from "../../assets/endowestern.png";
-import logo1 from "../../assets/logo1.png";
 import axios from "axios";
-
-const categories = [
-  { name: "Shirts", image: shirt, color: "from-blue-600 to-indigo-700" },
-  { name: "Kurta", image: kurta, color: "from-rose-600 to-pink-700" },
-  { name: "ModiJacket", image: ModiJacket, color: "from-green-600 to-teal-700" },
-  { name: "EndoWestern", image: endowestern, color: "from-purple-600 to-indigo-700" },
-];
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import logo1 from "../../assets/logo1.png";
 
 const Categories = () => {
   const navigate = useNavigate();
@@ -26,35 +17,77 @@ const Categories = () => {
   const [queryIds, setQueryIds] = useState(JSON.parse(localStorage.getItem("queryIds")) || []);
   const [queryResponses, setQueryResponses] = useState({});
   const [loadingResponse, setLoadingResponse] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Fetch categories from backend
   useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+        const endpoint = isAdmin ? "/api/categories" : "/api/categories";
+        const response = await axios.get(`${backend}${endpoint}`);
+        
+        if (response.data.success) {
+          setCategories(response.data.categories);
+        } else {
+          setError("Failed to load categories");
+          toast.error("Failed to load categories");
+        }
+      } catch (err) {
+        setError("Failed to load categories. Please try again later.");
+        toast.error("Failed to load categories");
+        console.error("Error fetching categories:", err);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+
+    // Cart item count setup
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     setCartItemCount(cart.length);
 
     const handleStorageChange = () => {
-      const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-      setCartItemCount(cart.length);
+      const updatedCart = JSON.parse(localStorage.getItem("cart") || "[]");
+      setCartItemCount(updatedCart.length);
     };
 
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [isAdmin]);
 
-  useEffect(() => {
-    if (queryIds.length > 0) {
-      queryIds.forEach((id) => {
-        if (!queryResponses[id]) {
-          fetchQueryResponse(id);
-        }
-      });
+  // Toggle category enabled status
+  const toggleCategoryStatus = async (categoryId, currentStatus) => {
+    try {
+      const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const endpoint = currentStatus ? 'disable' : 'enable';
+      
+      await axios.patch(`${backend}/api/categories/${categoryId}/${endpoint}`);
+      
+      setCategories(categories.map(category => 
+        category._id === categoryId 
+          ? { ...category, enabled: !currentStatus } 
+          : category
+      ));
+      
+      toast.success(`Category ${currentStatus ? 'disabled' : 'enabled'} successfully`);
+    } catch (error) {
+      toast.error(`Failed to ${currentStatus ? 'disable' : 'enable'} category`);
+      console.error("Error toggling category status:", error);
     }
-  }, [queryIds]);
+  };
 
+  // Handle user logout
   const handleLogout = () => {
     localStorage.clear();
     navigate("/login");
+    toast.success("Logged out successfully");
   };
 
+  // Submit user query
   const handleQuerySubmit = async (e) => {
     e.preventDefault();
     if (!query.trim()) return;
@@ -62,7 +95,9 @@ const Categories = () => {
     try {
       const userId = localStorage.getItem("userId");
       const name = localStorage.getItem("userName");
-      const response = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/queries`, {
+      const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      
+      const response = await axios.post(`${backend}/api/queries`, {
         userId,
         name,
         query,
@@ -77,18 +112,22 @@ const Categories = () => {
         localStorage.setItem("queryIds", JSON.stringify(updatedIds));
         return updatedIds;
       });
+      
+      toast.success("Query submitted successfully!");
       setTimeout(() => setQuerySubmitted(false), 3000);
     } catch (error) {
+      toast.error("Failed to submit query");
       console.error("Error submitting query:", error);
-      alert("Failed to submit query. Please try again.");
     }
   };
 
+  // Fetch query responses
   const fetchQueryResponse = async (id) => {
     setLoadingResponse(true);
     try {
       const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
       const { data } = await axios.get(`${backend}/api/queries/${id}`);
+      
       setQueryResponses((prev) => ({
         ...prev,
         [id]: data.success && data.query ? data.query.response || "No response yet." : "No response yet.",
@@ -101,13 +140,46 @@ const Categories = () => {
     }
   };
 
+  // Load query responses
+  useEffect(() => {
+    if (queryIds.length > 0) {
+      queryIds.forEach((id) => {
+        if (!queryResponses[id]) {
+          fetchQueryResponse(id);
+        }
+      });
+    }
+  }, [queryIds]);
+
+  if (loadingCategories) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+        <div className="text-red-500 text-lg">{error}</div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 font-sans">
       {/* Web Navigation */}
       <nav className="hidden md:block bg-white shadow-lg fixed w-full top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3">
-            <img src={logo1} className="h-14 transition-transform hover:scale-105" alt="FashionReels" />
+            <img src={logo1} className="h-14 transition-transform hover:scale-105" alt="Logo" />
           </Link>
           <div className="flex items-center gap-8">
             <Link
@@ -153,7 +225,7 @@ const Categories = () => {
       <nav className="md:hidden bg-white shadow-lg fixed w-full top-0 z-50">
         <div className="px-4 py-3 flex items-center justify-between">
           <Link to="/" className="flex items-center">
-            <img src={logo1} className="h-12" alt="FashionReels" />
+            <img src={logo1} className="h-12" alt="Logo" />
           </Link>
           <div className="flex items-center gap-4">
             <Link to="/cart" className="relative p-2 bg-orange-100 rounded-full">
@@ -224,34 +296,57 @@ const Categories = () => {
 
         {/* Category Grid */}
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-          {categories.map((category) => (
-            <Link
-              key={category.name}
-              to={`/categories/${category.name.toLowerCase()}/sizes`}
-              className="group relative overflow-hidden rounded-xl shadow-lg hover:shadow-xl transform hover:-translate-y-2 transition-all duration-500"
-            >
-              <div className="aspect-square relative">
-                <img
-                  src={category.image}
-                  alt={category.name}
-                  className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-black bg-opacity-30 group-hover:bg-opacity-50 transition-opacity duration-300" />
+          {categories
+            .filter(category => isAdmin || category.enabled)
+            .map((category) => (
+              <div key={category._id} className="group relative">
+                <Link 
+                  to={category.enabled ? `/categories/${category.name.toLowerCase()}/sizes` : '#'}
+                  className={`relative overflow-hidden rounded-xl shadow-lg hover:shadow-xl transform transition-all duration-500 bg-white block ${
+                    category.enabled ? 'hover:-translate-y-2' : 'opacity-60 cursor-not-allowed'
+                  }`}
+                >
+                  <div className="aspect-square relative">
+                    <img
+                      src={category.image}
+                      alt={category.name}
+                      className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = "https://via.placeholder.com/300x300?text=Image+Not+Available";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                    {!category.enabled && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <span className="text-white font-bold">DISABLED</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 flex items-end justify-center p-6">
+                    <h3 className="text-white font-bold text-xl capitalize">
+                      {category.name}
+                    </h3>
+                  </div>
+                </Link>
+                
+                {isAdmin && (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      toggleCategoryStatus(category._id, category.enabled);
+                    }}
+                    className={`absolute top-2 right-2 z-10 px-3 py-1 rounded-full text-xs font-bold ${
+                      category.enabled 
+                        ? 'bg-green-500 text-white hover:bg-green-600' 
+                        : 'bg-red-500 text-white hover:bg-red-600'
+                    }`}
+                  >
+                    {category.enabled ? 'Enable' : 'Disable'}
+                  </button>
+                )}
               </div>
-              <div
-                className={`absolute inset-0 bg-gradient-to-t ${category.color} opacity-70 group-hover:opacity-90 transition-opacity duration-300 flex items-end justify-center p-6`}
-              >
-                <div className="text-center text-white">
-                  <h2 className="text-2xl md:text-3xl font-bold tracking-wide group-hover:tracking-wider transition-all duration-300">
-                    {category.name}
-                  </h2>
-                  <p className="text-sm md:text-base mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    Shop Now →
-                  </p>
-                </div>
-              </div>
-            </Link>
-          ))}
+            ))}
         </div>
 
         {/* Query Box */}
@@ -328,26 +423,6 @@ const Categories = () => {
           </p>
         </footer>
       </div>
-
-      {/* Inline CSS for Animations */}
-      <style>
-        {`
-          @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .animate-fade-in {
-            animation: fadeIn 0.8s ease-out forwards;
-          }
-          @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .animate-slide-down {
-            animation: slideDown 0.5s ease-out forwards;
-          }
-        `}
-      </style>
     </div>
   );
 };

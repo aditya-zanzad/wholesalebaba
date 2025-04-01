@@ -1,19 +1,13 @@
-import mongoose from "mongoose";
+// models/categoryModel.js
+import mongoose from 'mongoose';
 
 const categorySchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true,
-    unique: true, // Ensures no duplicate category names
-  },
-  image: {
-    type: String, // Store image URL or path
-    required: true,
-  },
+  name: String,
+  image: String,
   enabled: {
     type: Boolean,
-    default: true, // Categories are enabled by default
-  },
+    default: true
+  }
 });
 
-export default mongoose.model("Category", categorySchema);
+export default mongoose.model('Category', categorySchema);

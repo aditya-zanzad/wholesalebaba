@@ -253,7 +253,8 @@ const Dashboard = () => {
                 { to: "/categories", label: "User View", icon: <ArrowUpRight size={18} /> },
                 { to: "/admin/querybox", label: "queries", icon: <ArrowUpRight size={18} /> },
                 { to: "/admin/home-text", label: "Home Text", icon: <ArrowUpRight size={18} /> },
-                { to: "/admin/category", label: "add category", icon: <ArrowUpRight size={18} /> }
+                { to: "/admin/category", label: "add category", icon: <ArrowUpRight size={18} /> },
+                { to: "/admin/categoryenable", label: "category enable", icon: <ArrowUpRight size={18} /> }
               ].map((item, index) => (
                 <li key={index}>
                   <Link

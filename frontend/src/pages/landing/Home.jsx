@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ShoppingBag, Video, TrendingUp, Smartphone, Menu, X } from "lucide-react";
 import logo from "../../assets/logo1.png";
+import Coursel from "../landing/Coursel";
 
 const featuresData = [
   {
@@ -64,7 +65,7 @@ const Home = () => {
   return (
     <div className="min-h-screen bg-ivory-50">
       {/* Mobile Navigation */}
-      <nav className="lg:hidden fixed w-full top-0 bg-taupe-900 shadow-lg z-50">
+      <nav className="lg:hidden fixed w-full top-0 bg-white shadow-lg z-50">
         <div className="px-4 py-4 flex justify-between items-center">
           <div className="flex items-center">
             <img src={logo} className="h-12" alt="FashionReels Logo" />
@@ -133,6 +134,10 @@ const Home = () => {
           </Link>
         </div>
       </section>
+
+      
+      <Coursel/>
+
 
       {/* Features Section */}
       <section className="py-12 sm:py-16 lg:py-24 bg-ivory-200">

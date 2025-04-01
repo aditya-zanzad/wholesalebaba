@@ -972,6 +972,66 @@ router.get("/api/categories", async (req, res) => {
   }
 });
 
+// for delete category
+router.patch('/api/categories/:id/enable', async (req, res) => {
+  try {
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { enabled: true },
+      { new: true, runValidators: true }
+    );
+
+    if (!category) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Category not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Category enabled successfully',
+      category
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error enabling category',
+      error: error.message
+    });
+  }
+});
+
+// Disable a category
+router.patch('/api/categories/:id/disable', async (req, res) => {
+  try {
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { enabled: false },
+      { new: true, runValidators: true }
+    );
+
+    if (!category) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Category not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Category disabled successfully',
+      category
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error disabling category',
+      error: error.message
+    });
+  }
+});
+
 
 export default router;
 

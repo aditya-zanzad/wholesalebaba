@@ -11,7 +11,7 @@ const MenPage = () => {
         <h1 className="text-3xl md:text-4xl font-bold text-gray-800 text-center mb-8 animate-fade-in">
           Men's Fashion Collection
         </h1>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
           {/* Image Card */}
           <div
@@ -42,20 +42,22 @@ const MenPage = () => {
           {/* Additional Info Section */}
           <div className="space-y-6 animate-fade-in-up">
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                New Arrivals
+              <h3 className="text-2xl font-semibold text-gray-800 mb-2">
+                BENEFITS FOR SHOPKEEPERS
               </h3>
               <p className="text-gray-600">
-                Check out our latest collection of men's apparel, featuring modern designs and premium quality.
+              You don’t need to order all sizes. You can buy only the sizes required for your shop. This will help control stock in your shop.
               </p>
             </div>
-            
+
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h3 className="text-xl font-semibold text-gray-800 mb-2">
-                Seasonal Trends
+              <h3 className="text-2xl font-semibold text-gray-800 mb-2">
+              MINIMUM ORDER RS 2000/- ONLY
               </h3>
               <p className="text-gray-600">
-                From casual wear to formal attire, find the perfect outfit for every occasion.
+                All india shipping Facility
+                available <br></br>This Platform will help retailers To get Products
+                at Lowest price.
               </p>
             </div>
           </div>

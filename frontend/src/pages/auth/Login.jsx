@@ -73,7 +73,7 @@ const Login = () => {
           <div className="max-w-md mx-auto">
             {/* Mobile Header */}
             <div className="lg:hidden text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">FashionReels</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">wholesalebaba</h1>
               <p className="text-gray-500">Sign in to continue</p>
             </div>
 
