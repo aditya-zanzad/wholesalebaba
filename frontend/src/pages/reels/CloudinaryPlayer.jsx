@@ -73,6 +73,23 @@ const CloudinaryPlayer = () => {
     setSelectedQuantity(1);
   }, [currentIndex]);
 
+  useEffect(() => {
+    setAnimatedDiscount(0);
+    let start = 0;
+    const targetDiscount = 60; // Fixed discount percentage
+
+    const interval = setInterval(() => {
+      if (start < targetDiscount) {
+        start++;
+        setAnimatedDiscount(start);
+      } else {
+        clearInterval(interval);
+      }
+    }, 40);
+
+    return () => clearInterval(interval);
+  }, [currentIndex]);
+
   const handleNextReel = () => {
     if (videoData.length === 0) {
       alert(
@@ -121,24 +138,6 @@ const CloudinaryPlayer = () => {
     alert("Added to cart 🛒");
   };
 
-  useEffect(() => {
-    setAnimatedDiscount(0);
-    let start = 0;
-    const increasePercentage =
-      Math.floor(Math.random() * (80 - 50 + 1)) + 50;
-
-    const interval = setInterval(() => {
-      if (start < increasePercentage) {
-        start++;
-        setAnimatedDiscount(start);
-      } else {
-        clearInterval(interval);
-      }
-    }, 40);
-
-    return () => clearInterval(interval);
-  }, [currentIndex]);
-
   return (
     <div className="reel-container flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
       {videoData.length > 0 ? (
@@ -161,12 +160,8 @@ const CloudinaryPlayer = () => {
           <div className="absolute top-3 left-3 bg-black bg-opacity-60 text-white px-4 py-2 rounded-md">
             {videoData[currentIndex]?.price !== undefined && (() => {
               const discountedPrice = videoData[currentIndex].price;
-              const increasePercentage =
-                Math.floor(Math.random() * (80 - 50 + 1)) + 50;
-              const originalPrice = (
-                discountedPrice *
-                (1 + increasePercentage / 100)
-              ).toFixed(2);
+              const discountPercentage = 60; // Fixed discount percentage
+              const originalPrice = (discountedPrice / (1 - discountPercentage / 100)).toFixed(2);
               const isOutOfStock = videoData[currentIndex].quantity === 0;
 
               return (
@@ -191,8 +186,10 @@ const CloudinaryPlayer = () => {
                   </p>
 
                   <p className="text-lg font-bold text-yellow-600">
-                    Wholesale Price: ₹{discountedPrice} (<span className="text-white text-sm">
-                      {animatedDiscount}% OFF</span>)
+                    Wholesale Price: ₹{discountedPrice} (
+                    <span className="text-white text-sm">
+                      {animatedDiscount}% OFF
+                    </span>)
                   </p>
                   <p className={`text-sm ${isOutOfStock ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
                     {isOutOfStock ? "Out of Stock" : `Available: ${videoData[currentIndex].quantity} | Selected: ${selectedQuantity}`}

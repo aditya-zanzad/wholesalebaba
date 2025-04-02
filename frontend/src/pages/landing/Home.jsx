@@ -7,21 +7,27 @@ import Coursel from "../landing/Coursel";
 const featuresData = [
   {
     icon: <TrendingUp className="w-8 h-8 text-coral-500" />,
-    title: "Trend Discovery",
-    content: "Stay ahead with daily video reels showcasing the latest styles.",
-    bg: "bg-ivory-50",
+    title: "Buy stocks for your shops/buisness easily .",
+    content: "",
+    bg: "bg-amber-100",
   },
   {
     icon: <Video className="w-8 h-8 text-rose-gold-500" />,
-    title: "Immersive Shopping",
-    content: "Shop effortlessly within stunning video experiences.",
-    bg: "bg-rose-gold-50",
+    title: "Great wholesale prices and offers.",
+    content: "",
+    bg: "bg-amber-100",
   },
   {
     icon: <Smartphone className="w-8 h-8 text-taupe-500" />,
-    title: "Mobile First",
-    content: "Designed for seamless swiping on any device.",
-    bg: "bg-taupe-50",
+    title: "Quick doorstep delivery.",
+    content: "",
+    bg: "bg-amber-100",
+  },
+  {
+    icon: <Smartphone className="w-8 h-8 text-taupe-500" />,
+    title: "Empowering small businesses across bharat.",
+    content: "",
+    bg: "bg-amber-100",
   },
 ];
 
@@ -90,7 +96,7 @@ const Home = () => {
       </nav>
 
       {/* Desktop Navigation */}
-      <nav className="hidden lg:block fixed w-full top-0 bg-taupe-900 shadow-lg z-50">
+      <nav className="hidden lg:block fixed w-full top-0 bg-white shadow-lg z-50">
         <div className="max-w-7xl mx-auto px-6 py-5 flex justify-between items-center">
           <div className="flex items-center">
             <img src={logo} className="h-14" alt="FashionReels Logo" />
@@ -114,7 +120,7 @@ const Home = () => {
         <div className="max-w-5xl mx-auto overflow-hidden">
           <div>
             {/* First h1 - now properly responsive */}
-            <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-extrabold text-gray-500 mb-3 sm:mb-4 md:mb-5 lg:mb-6 tracking-tight">
+            <h1 className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-extrabold text-gray-600 mb-3 sm:mb-4 md:mb-5 lg:mb-6 tracking-tight">
               MANUFACTURER TO RETAILER
             </h1>
             {/* Second h1 - now properly responsive */}
@@ -140,10 +146,10 @@ const Home = () => {
 
 
       {/* Features Section */}
-      <section className="py-12 sm:py-16 lg:py-24 bg-ivory-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+      <section className="py-12 sm:py-16 lg:py-24 bg-ivory-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 ">
           {featuresData.map((feature, index) => (
-            <FeatureCard key={index} {...feature} />
+            <FeatureCard className="" key={index} {...feature}  />
           ))}
         </div>
       </section>
@@ -176,7 +182,7 @@ const Home = () => {
 
       {/* Footer */}
       <footer className="bg-taupe-900 py-6 sm:py-8 text-center text-ivory-50 text-sm sm:text-base">
-        © 2025 FashionReels. All rights reserved.
+        ©2025 wholesalebaba.online All rights reserved.
       </footer>
     </div>
   );

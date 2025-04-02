@@ -52,7 +52,7 @@ const Carousel = () => {
             key={index}
             src={img}
             alt={`Slide ${index}`}
-            className={`absolute w-full h-full object-cover transition-opacity duration-700 ${
+            className={`absolute w-full h-[600px] object-cover transition-opacity duration-700 ${
               index === currentIndex ? "opacity-100" : "opacity-0"
             }`}
           />
