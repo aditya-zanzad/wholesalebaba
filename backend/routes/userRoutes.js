@@ -1031,7 +1031,7 @@ router.patch('/api/categories/:id/disable', async (req, res) => {
     });
   }
 });
-
+// this is the backend route we cjeck
 
 export default router;
 
