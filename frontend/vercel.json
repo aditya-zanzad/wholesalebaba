@@ -1,0 +1,9 @@
+{
+    "rewrites": [
+      {
+        "source": "/api/:path*",
+        "destination": "https://deployclothbrand.onrender.com/api/:path*"
+      }
+    ]
+  }
+  
