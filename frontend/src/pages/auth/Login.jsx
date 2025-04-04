@@ -59,9 +59,8 @@ const Login = () => {
             <div className="relative w-full aspect-square max-w-[400px] mx-auto">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <h2 className="text-4xl font-bold mb-4">PREMIUM</h2>
-                  <h3 className="text-3xl font-semibold">SANGTANI</h3>
-                  <p className="text-xl mt-2">MEMBERSHIP</p>
+                  <h2 className="text-4xl font-bold mb-4">Wholesalebaba</h2>
+                  <h3 className="text-3xl font-semibold">online</h3>
                 </div>
               </div>
             </div>

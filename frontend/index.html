@@ -1,15 +1,63 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <!-- Primary Meta Tags -->
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Wholesalebaba</title>
+    <title>WholesaleBaba | Bulk Clothing Supplier India | Wholesale Fashion Distributor</title>
+    <meta name="description" content="India's #1 wholesale clothing supplier. Buy bulk apparel at factory prices with 100+ styles, low MOQ & pan-India delivery. Trusted by 10,000+ retailers.">
+    <meta name="keywords" content="wholesale clothing, bulk apparel supplier, cheap wholesale clothes India, fashion distributor, wholesale supplier, clothing bulk buy">
+    
+    <!-- Open Graph / Social Media Meta Tags -->
+    <meta property="og:title" content="WholesaleBaba | Bulk Clothing Supplier India">
+    <meta property="og:description" content="India's trusted wholesale fashion distributor with 100+ styles at factory prices">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wholesalebaba.com">
+    <meta property="og:image" content="https://wholesalebaba.com/src/assets/logo-social.png">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://wholesalebaba.com">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="./src/assets/logo2.png">
+    
+    <!-- Preconnect to CDNs for faster loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    
+    <!-- CSS Resources -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- Schema.org markup for Google -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WholesaleStore",
+      "name": "WholesaleBaba",
+      "url": "https://wholesalebaba.com",
+      "description": "India's leading wholesale clothing supplier",
+      "priceRange": "₹",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Mumbai",
+        "addressRegion": "MH",
+        "postalCode": "400001",
+        "addressCountry": "IN"
+      }
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Loading optimization -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>
