@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { CheckCircle, Home } from "lucide-react";
+import React, { useEffect, useState, useRef } from "react";
+import { CheckCircle, Home, Printer, Download } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
+import { useReactToPrint } from "react-to-print";
 
 const PaymentSuccessful = () => {
   const location = useLocation();
@@ -13,6 +14,7 @@ const PaymentSuccessful = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [inputOrderId, setInputOrderId] = useState(urlOrderId || "");
+  const receiptRef = useRef();
 
   useEffect(() => {
     if (urlOrderId) {
@@ -52,167 +54,340 @@ const PaymentSuccessful = () => {
     fetchOrderDetails(inputOrderId);
   };
 
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+      @media print {
+        body {
+          padding: 20px;
+          background: white;
+        }
+        .no-print {
+          display: none !important;
+        }
+        .print-section {
+          box-shadow: none;
+          border: 1px solid #ddd;
+        }
+      }
+    `,
+    documentTitle: `Order_${order?.order_id || "Receipt"}`,
+  });
+
+  const formatDate = (dateString) => {
+    const options = { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    };
+    return new Date(dateString).toLocaleDateString('en-IN', options);
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-gray-100 py-6 px-4 sm:px-6 lg:px-8 flex items-center justify-center">
-      <div className="bg-white p-6 sm:p-8 rounded-xl shadow-lg text-center max-w-3xl w-full">
-        <CheckCircle className="w-12 h-12 sm:w-16 sm:h-16 text-green-500 mx-auto animate-bounce" />
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mt-4">Payment Successful!</h1>
-        <p className="text-gray-600 mt-2 text-sm sm:text-base">
-          Thank you for your purchase. Here are your order details.
-        </p>
+    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="no-print mb-6 flex justify-between items-center">
+          <Link to={-1} className="flex items-center text-blue-600 hover:text-blue-800">
+            <Home className="w-5 h-5 mr-2" />
+            <span className="text-sm font-medium">Back to Home</span>
+          </Link>
+          {order && (
+            <div className="flex space-x-3">
+              <button
+                onClick={handlePrint}
+                className="flex items-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-all"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                <span className="text-sm">Print Invoice</span>
+              </button>
+              <button
+                onClick={handlePrint}
+                className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                <span className="text-sm">Download PDF</span>
+              </button>
+            </div>
+          )}
+        </div>
 
-        {!urlOrderId && (
-          <div className="mt-6 space-y-4">
-            <input
-              type="text"
-              value={inputOrderId}
-              onChange={(e) => setInputOrderId(e.target.value)}
-              placeholder="Enter Order ID (e.g., order_Q4OJpMNtAIgFwk)"
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 text-sm sm:text-base"
-            />
-            <button
-              onClick={handleFetchOrder}
-              disabled={loading}
-              className={`w-full px-6 py-3 bg-indigo-600 text-white rounded-full font-semibold hover:bg-indigo-700 transition-all shadow-md text-sm sm:text-base ${
-                loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-            >
-              {loading ? "Fetching..." : "Fetch Order Details"}
-            </button>
+        {/* Main Content */}
+        <div ref={receiptRef} className="bg-white p-6 rounded-lg shadow-md print-section">
+          {/* Success Header */}
+          <div className="flex items-center justify-between border-b pb-4 mb-6">
+            <div className="flex items-center">
+              <CheckCircle className="w-10 h-10 text-green-500 mr-3" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">Order Successful!</h1>
+                <p className="text-gray-600">Thank you for shopping with us</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Order Date</p>
+              <p className="font-medium">{order ? formatDate(order.createdAt) : "--/--/----"}</p>
+            </div>
           </div>
-        )}
 
-        {loading && urlOrderId ? (
-          <div className="mt-6 animate-pulse text-gray-500 text-sm sm:text-base">
-            Loading order details...
-          </div>
-        ) : error ? (
-          <div className="mt-6 text-red-500 text-sm sm:text-base">{error}</div>
-        ) : (
-          order && (
-            <div className="mt-6 space-y-6">
-              {/* Payment ID */}
-              {order.payment_id && (
-                <div className="bg-gray-50 p-3 sm:p-4 rounded-md text-sm text-gray-700">
-                  <span className="font-medium">Payment ID:</span> {order.payment_id}
+          {/* Order ID Section */}
+          <div className="bg-blue-50 p-4 rounded-lg mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+              <div>
+                <p className="text-sm text-gray-600">Order ID</p>
+                <p className="font-bold text-lg">{order?.order_id || "------"}</p>
+              </div>
+              {paymentId && (
+                <div className="mt-2 sm:mt-0">
+                  <p className="text-sm text-gray-600">Payment ID</p>
+                  <p className="font-medium">{paymentId}</p>
                 </div>
               )}
+            </div>
+          </div>
 
-              {/* Order Summary */}
-              <div className="bg-green-50 p-4 sm:p-6 rounded-md text-left">
-                <h2 className="text-lg sm:text-xl font-semibold text-green-700 mb-2">Order Summary</h2>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Order ID:</span> {order.order_id}
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Internal ID:</span> {order._id}
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">User ID:</span> {order.user_id}
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Amount:</span> ₹{(order.amount / 100).toFixed(2)}
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Currency:</span> {order.currency}
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Status:</span>{" "}
-                  <span
-                    className={`inline-flex items-center px-2 py-1 rounded-full text-xs sm:text-sm font-medium shadow-sm ${
-                      order.status === "paid" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {order.status}
-                  </span>
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Created At:</span>{" "}
-                  {new Date(order.createdAt).toLocaleString()}
-                </p>
-                <p className="text-sm sm:text-base">
-                  <span className="font-medium">Updated At:</span>{" "}
-                  {new Date(order.updatedAt).toLocaleString()}
-                </p>
+          {/* Fetch Order Form (if no URL order ID) */}
+          {!urlOrderId && (
+            <div className="no-print bg-gray-50 p-4 rounded-lg mb-6">
+              <h2 className="text-lg font-medium mb-3">Enter Order Details</h2>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  value={inputOrderId}
+                  onChange={(e) => setInputOrderId(e.target.value)}
+                  placeholder="Enter Order ID (e.g., order_Q4OJpMNtAIgFwk)"
+                  className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={handleFetchOrder}
+                  disabled={loading}
+                  className={`px-6 py-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-all ${
+                    loading ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                >
+                  {loading ? "Fetching..." : "Fetch Details"}
+                </button>
+              </div>
+              {error && <p className="text-red-500 mt-2 text-sm">{error}</p>}
+            </div>
+          )}
+
+          {/* Loading State */}
+          {loading && (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+              <p className="mt-3 text-gray-600">Fetching order details...</p>
+            </div>
+          )}
+
+          {/* Order Details */}
+          {order && (
+            <div className="space-y-6">
+              {/* Delivery Address */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b">
+                  <h2 className="font-medium">Delivery Address</h2>
+                </div>
+                <div className="p-4">
+                  {order.shippingAddress ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="font-medium">{order.shippingAddress.name}</p>
+                        <p className="text-gray-600">{order.shippingAddress.street}</p>
+                        <p className="text-gray-600">
+                          {order.shippingAddress.city}, {order.shippingAddress.pincode}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600">
+                          <span className="font-medium">Phone:</span> {order.shippingAddress.phone}
+                        </p>
+                        <p className="text-gray-600">
+                          <span className="font-medium">Email:</span> {order.shippingAddress.email}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No shipping address provided</p>
+                  )}
+                </div>
               </div>
 
-              {/* Shipping Address */}
-              {order.shippingAddress && (
-                <div className="bg-gray-50 p-4 sm:p-6 rounded-md text-left">
-                  <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">Shipping Address</h2>
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium">Name:</span> {order.shippingAddress.name}
-                  </p>
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium">Street:</span> {order.shippingAddress.street}
-                  </p>
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium">City:</span> {order.shippingAddress.city},{" "}
-                    {order.shippingAddress.pincode}
-                  </p>
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium">Phone:</span> 📞 {order.shippingAddress.phone}
-                  </p>
-                  <p className="text-sm sm:text-base">
-                    <span className="font-medium">Email:</span> 📧 {order.shippingAddress.email}
-                  </p>
+              {/* Order Summary */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b">
+                  <h2 className="font-medium">Order Summary</h2>
                 </div>
-              )}
-
-              {/* Products */}
-              {order.products && order.products.length > 0 && (
-                <div className="bg-gray-50 p-4 sm:p-6 rounded-md text-left">
-                  <h2 className="text-lg sm:text-xl font-semibold text-gray-700 mb-4">Products</h2>
-                  <div className="space-y-6">
-                    {order.products.map((product) => (
-                      <div
-                        key={product._id}
-                        className="border-b py-4 flex flex-col sm:flex-row gap-4 items-start"
-                      >
-                        <div className="flex-1 space-y-1">
-                          <p className="text-sm sm:text-base font-medium text-gray-800">
-                            Product ID: {product._id}
-                          </p>
-                          <p className="text-sm sm:text-base text-gray-600">
-                            <span className="font-medium">Price:</span> ₹{(product.price / 100).toFixed(2)}
-                          </p>
-                          <p className="text-sm sm:text-base text-gray-600">
-                            <span className="font-medium">Quantity:</span> {product.quantity || "N/A"}
-                          </p>
-                          <p className="text-sm sm:text-base text-gray-600">
-                            <span className="font-medium">Size:</span> {product.size || "N/A"}
-                          </p>
-                          <p className="text-sm sm:text-base text-gray-600">
-                            <span className="font-medium">Category:</span> {product.category || "N/A"}
-                          </p>
-                        </div>
+                <div className="p-4">
+                  <div className="space-y-4">
+                    {order.products?.map((product, index) => (
+                      <div key={index} className="flex border-b pb-4 last:border-b-0 last:pb-0">
                         {product.videoUrl && (
-                          <div className="w-full sm:w-48">
+                          <div className="w-20 h-20 flex-shrink-0 mr-4">
                             <video
                               src={product.videoUrl}
-                              controls
-                              className="w-full h-32 sm:h-24 rounded-md shadow-sm object-cover"
-                            >
-                              Your browser does not support the video tag.
-                            </video>
+                              className="w-full h-full object-cover rounded"
+                              muted
+                              loop
+                              playsInline
+                            />
                           </div>
                         )}
+                        <div className="flex-1">
+                          <p className="font-medium">{product.category} ({product.size})</p>
+                          <p className="text-gray-600 text-sm">Quantity: {product.quantity}</p>
+                          <p className="text-gray-600 text-sm">₹{product.price.toFixed(2)} each</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">₹{(product.price * product.quantity).toFixed(2)}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Back to Home */}
-              <Link
-                to="/"
-                className="mt-6 inline-flex items-center px-6 py-3 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition-all shadow-md text-sm sm:text-base"
-              >
-                <Home className="w-5 h-5 mr-2" />
-                Back to Home
-              </Link>
+              {/* Payment Summary */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b">
+                  <h2 className="font-medium">Payment Summary</h2>
+                </div>
+                <div className="p-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Order Total</span>
+                      <span>₹{(order.amount / 100).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Payment Method</span>
+                      <span className="capitalize">{order.paymentMethod || "Online Payment"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Payment Status</span>
+                      <span className="text-green-600 font-medium">Paid</span>
+                    </div>
+                    <div className="pt-2 mt-2 border-t">
+                      <div className="flex justify-between font-bold">
+                        <span>Total Amount Paid</span>
+                        <span>₹{(order.amount / 100).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Status Timeline */}
+              <div className="border rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b">
+                  <h2 className="font-medium">Order Status</h2>
+                </div>
+                <div className="p-4">
+                  <div className="flex flex-col space-y-4">
+                    <div className="flex items-start">
+                      <div className="flex flex-col items-center mr-4">
+                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="w-px h-8 bg-gray-300 mt-1"></div>
+                      </div>
+                      <div>
+                        <p className="font-medium">Order Confirmed</p>
+                        <p className="text-gray-500 text-sm">
+                          {formatDate(order.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="flex flex-col items-center mr-4">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          order.status === "Shipped" ? "bg-green-500" : "bg-gray-300"
+                        }`}>
+                          {order.status === "Shipped" ? (
+                            <CheckCircle className="w-4 h-4 text-white" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                          )}
+                        </div>
+                        <div className="w-px h-8 bg-gray-300 mt-1"></div>
+                      </div>
+                      <div>
+                        <p className={`font-medium ${
+                          order.status === "Shipped" ? "text-gray-800" : "text-gray-400"
+                        }`}>Shipped</p>
+                        {order.status === "Shipped" && order.updatedAt && (
+                          <p className="text-gray-500 text-sm">
+                            {formatDate(order.updatedAt)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-start">
+                      <div className="flex flex-col items-center mr-4">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          order.status === "Delivered" ? "bg-green-500" : "bg-gray-300"
+                        }`}>
+                          {order.status === "Delivered" ? (
+                            <CheckCircle className="w-4 h-4 text-white" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-white"></div>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className={`font-medium ${
+                          order.status === "Delivered" ? "text-gray-800" : "text-gray-400"
+                        }`}>Delivered</p>
+                        {order.status === "Delivered" && order.updatedAt && (
+                          <p className="text-gray-500 text-sm">
+                            {formatDate(order.updatedAt)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Customer Support */}
+              <div className="no-print bg-blue-50 p-4 rounded-lg text-center">
+                <h3 className="font-medium mb-2">Need Help?</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Contact our customer support for any questions about your order
+                </p>
+                <div className="flex flex-col sm:flex-row justify-center gap-3">
+                  <a
+                    href="mailto:support@example.com"
+                    className="px-4 py-2 bg-white border border-blue-500 text-blue-600 rounded-md hover:bg-blue-50 transition-all text-sm"
+                  >
+                    Email Support
+                  </a>
+                  <a
+                    href="tel:+919876543210"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-all text-sm"
+                  >
+                    Call Support
+                  </a>
+                </div>
+              </div>
             </div>
-          )
+          )}
+        </div>
+
+        {/* Continue Shopping */}
+        {order && (
+          <div className="no-print mt-6 text-center">
+            <Link
+              to="/categories"
+              className="inline-flex items-center px-6 py-3 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-all font-medium"
+            >
+              Continue Shopping
+            </Link>
+          </div>
         )}
       </div>
     </div>
