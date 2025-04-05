@@ -25,11 +25,24 @@ const Checkout = () => {
     paymentMethod: "Online Payment",
   });
   const [errors, setErrors] = useState({});
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem("cart")) || [];
     setCartItems(cart);
+    
+    // Cleanup function to ensure scroll is restored if component unmounts
+    return () => {
+      restoreScroll();
+    };
   }, []);
+
+  const restoreScroll = () => {
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'static';
+    document.body.style.height = 'auto';
+    document.body.style.width = 'auto';
+  };
 
   const calculateSubtotal = () => parseFloat(cartItems
     .reduce((total, item) => total + (item.price || 0) * (item.quantity || 1), 0))
@@ -63,22 +76,30 @@ const Checkout = () => {
   };
 
   const handlePayment = async () => {
+    if (isProcessingPayment) return;
+    
     if (!validateForm()) {
       alert("Please fix form errors before proceeding");
       return;
     }
-    // Payment logic remains the same
+
+    setIsProcessingPayment(true);
+    
     try {
       if (!await loadRazorpay("https://checkout.razorpay.com/v1/checkout.js")) {
         alert("Failed to load payment gateway");
+        setIsProcessingPayment(false);
         return;
       }
+
       const backend = import.meta.env.VITE_BACKEND_URL;
       const userId = localStorage.getItem("userId");
       if (!userId) {
         alert("Please login to continue");
+        setIsProcessingPayment(false);
         return;
       }
+
       const { data } = await axios.post(`${backend}/api/payment/create-order`, {
         amount: calculateTotal() * 100,
         user_id: userId,
@@ -98,6 +119,13 @@ const Checkout = () => {
           phone: formData.phone
         }
       });
+
+      // Lock scroll before opening modal
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY,
         amount: data.amount,
@@ -112,19 +140,41 @@ const Checkout = () => {
               payment_id: response.razorpay_payment_id
             });
             localStorage.removeItem("cart");
+            restoreScroll();
             window.location.href = `/order-confirmation/${data.id}`;
           } catch (error) {
             console.error("Confirmation failed:", error);
+            restoreScroll();
             alert("Payment succeeded but confirmation failed. Contact support.");
+          } finally {
+            setIsProcessingPayment(false);
           }
         },
         prefill: formData,
-        theme: { color: "#2874f0" }, // Flipkart blue
-        modal: { ondismiss: () => alert("Payment cancelled") }
+        theme: { color: "#2874f0" },
+        modal: { 
+          ondismiss: () => {
+            restoreScroll();
+            setIsProcessingPayment(false);
+            alert("Payment cancelled");
+          }
+        }
       };
-      new window.Razorpay(options).open();
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response) => {
+        restoreScroll();
+        setIsProcessingPayment(false);
+        console.error("Payment failed:", response.error);
+        alert(`Payment failed: ${response.error.description}`);
+      });
+
+      rzp.open();
+
     } catch (error) {
       console.error("Payment error:", error);
+      restoreScroll();
+      setIsProcessingPayment(false);
       alert("Payment failed. Please try again.");
     }
   };
@@ -208,10 +258,23 @@ const Checkout = () => {
               <div className="mt-6">
                 <button
                   onClick={handlePayment}
-                  className="w-full py-3 bg-yellow-400 text-gray-800 font-semibold rounded-md hover:bg-yellow-500 transition-colors flex items-center justify-center shadow-md"
+                  disabled={isProcessingPayment}
+                  className={`w-full py-3 ${isProcessingPayment ? 'bg-yellow-500' : 'bg-yellow-400'} text-gray-800 font-semibold rounded-md hover:bg-yellow-500 transition-colors flex items-center justify-center shadow-md`}
                 >
-                  <Lock className="w-5 h-5 mr-2" />
-                  Proceed to Payment
+                  {isProcessingPayment ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-gray-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-5 h-5 mr-2" />
+                      Proceed to Payment
+                    </>
+                  )}
                 </button>
                 <p className="text-xs text-gray-500 mt-2 text-center">
                   Safe and Secure Payments. Easy returns. 100% Authentic products.
