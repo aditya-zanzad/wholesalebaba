@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from "react";
-import { CheckCircle, Home, Printer, Download } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { CheckCircle, Home } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import axios from "axios";
-import { useReactToPrint } from "react-to-print";
 
 const PaymentSuccessful = () => {
   const location = useLocation();
@@ -14,7 +13,6 @@ const PaymentSuccessful = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [inputOrderId, setInputOrderId] = useState(urlOrderId || "");
-  const receiptRef = useRef();
 
   useEffect(() => {
     if (urlOrderId) {
@@ -54,30 +52,6 @@ const PaymentSuccessful = () => {
     fetchOrderDetails(inputOrderId);
   };
 
-  const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
-    pageStyle: `
-      @page {
-        size: A4;
-        margin: 10mm;
-      }
-      @media print {
-        body {
-          padding: 20px;
-          background: white;
-        }
-        .no-print {
-          display: none !important;
-        }
-        .print-section {
-          box-shadow: none;
-          border: 1px solid #ddd;
-        }
-      }
-    `,
-    documentTitle: `Order_${order?.order_id || "Receipt"}`,
-  });
-
   const formatDate = (dateString) => {
     const options = { 
       year: 'numeric', 
@@ -93,33 +67,15 @@ const PaymentSuccessful = () => {
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="no-print mb-6 flex justify-between items-center">
+        <div className="mb-6">
           <Link to={-1} className="flex items-center text-blue-600 hover:text-blue-800">
             <Home className="w-5 h-5 mr-2" />
             <span className="text-sm font-medium">Back to Home</span>
           </Link>
-          {order && (
-            <div className="flex space-x-3">
-              <button
-                onClick={handlePrint}
-                className="flex items-center bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-all"
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                <span className="text-sm">Print Invoice</span>
-              </button>
-              <button
-                onClick={handlePrint}
-                className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                <span className="text-sm">Download PDF</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Main Content */}
-        <div ref={receiptRef} className="bg-white p-6 rounded-lg shadow-md print-section">
+        <div className="bg-white p-6 rounded-lg shadow-md">
           {/* Success Header */}
           <div className="flex items-center justify-between border-b pb-4 mb-6">
             <div className="flex items-center">
@@ -153,7 +109,7 @@ const PaymentSuccessful = () => {
 
           {/* Fetch Order Form (if no URL order ID) */}
           {!urlOrderId && (
-            <div className="no-print bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
               <h2 className="text-lg font-medium mb-3">Enter Order Details</h2>
               <div className="flex flex-col sm:flex-row gap-3">
                 <input
@@ -354,7 +310,7 @@ const PaymentSuccessful = () => {
               </div>
 
               {/* Customer Support */}
-              <div className="no-print bg-blue-50 p-4 rounded-lg text-center">
+              <div className="bg-blue-50 p-4 rounded-lg text-center">
                 <h3 className="font-medium mb-2">Need Help?</h3>
                 <p className="text-sm text-gray-600 mb-3">
                   Contact our customer support for any questions about your order
@@ -380,7 +336,7 @@ const PaymentSuccessful = () => {
 
         {/* Continue Shopping */}
         {order && (
-          <div className="no-print mt-6 text-center">
+          <div className="mt-6 text-center">
             <Link
               to="/categories"
               className="inline-flex items-center px-6 py-3 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-all font-medium"
