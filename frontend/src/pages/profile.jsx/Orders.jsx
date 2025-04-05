@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import { Package, Clock, CheckCircle, Download } from "lucide-react";
+import { Package, Clock, CheckCircle, Download, CreditCard } from "lucide-react";
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("Paid"); // Default to showing paid orders
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -30,18 +30,22 @@ const Orders = () => {
     fetchOrders();
   }, []);
 
-  // Filter orders based on status
+  // Filter orders based on status (case-insensitive)
   const filteredOrders = filterStatus === "All"
     ? orders
-    : orders.filter((order) => order.status === filterStatus);
+    : orders.filter((order) => order.status.toLowerCase() === filterStatus.toLowerCase());
 
-  // Export to CSV (updated to include User ID)
+  // Export to CSV - only paid orders by default
   const exportToCSV = () => {
+    const ordersToExport = filterStatus === "All" 
+      ? orders.filter(order => order.status.toLowerCase() === "paid")
+      : filteredOrders;
+
     const csvContent = [
       ["Order ID", "User ID", "Customer", "Date", "Amount", "Status"],
-      ...filteredOrders.map((order) => [
+      ...ordersToExport.map((order) => [
         order.order_id,
-        order.userId || "N/A", // Added User ID
+        order.userId || "N/A",
         order.shippingAddress?.name || "N/A",
         new Date(order.createdAt).toLocaleDateString(),
         `₹${(order.amount / 100).toFixed(2)}`,
@@ -55,7 +59,7 @@ const Orders = () => {
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "orders.csv";
+    link.download = filterStatus === "All" ? "paid_orders.csv" : `${filterStatus.toLowerCase()}_orders.csv`;
     link.click();
   };
 
@@ -94,20 +98,20 @@ const Orders = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 sm:mb-8">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 flex items-center mb-4 sm:mb-0">
             <Package className="w-8 h-8 sm:w-10 sm:h-10 mr-3 text-indigo-600 animate-bounce" />
-            Orders Dashboard
+            {filterStatus === "All" ? "All Orders" : `${filterStatus} Orders`}
           </h1>
           <button
             onClick={exportToCSV}
             className="flex items-center bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-all shadow-md"
           >
             <Download className="w-5 h-5 mr-2" />
-            Export CSV
+            Export {filterStatus === "All" ? "Paid" : filterStatus} Orders
           </button>
         </div>
 
         {/* Filter Buttons */}
         <div className="mb-6 flex flex-wrap gap-3 justify-center sm:justify-start">
-          {["All", "Processing", "Shipped"].map((status) => (
+          {["Paid", "Processing", "Shipped", "All"].map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
@@ -126,7 +130,7 @@ const Orders = () => {
         {filteredOrders.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl shadow-lg">
             <p className="text-gray-500 text-lg sm:text-xl font-medium">
-              No orders found for this filter.
+              No {filterStatus.toLowerCase()} orders found.
             </p>
           </div>
         ) : (
@@ -136,7 +140,7 @@ const Orders = () => {
                 <thead className="bg-indigo-600 text-white">
                   <tr>
                     <th className="p-3 sm:p-4 font-semibold">Order ID</th>
-                    <th className="p-3 sm:p-4 font-semibold">User ID</th> {/* Added User ID */}
+                    <th className="p-3 sm:p-4 font-semibold">User ID</th>
                     <th className="p-3 sm:p-4 font-semibold">Customer</th>
                     <th className="p-3 sm:p-4 font-semibold">Date</th>
                     <th className="p-3 sm:p-4 font-semibold">Amount</th>
@@ -154,7 +158,7 @@ const Orders = () => {
                     >
                       <td className="p-3 sm:p-4 font-medium text-gray-800">{order.order_id}</td>
                       <td className="p-3 sm:p-4 text-gray-700 font-mono">
-                        {order.userId || "N/A"} {/* Display User ID */}
+                        {order.userId || "N/A"}
                       </td>
                       <td className="p-3 sm:p-4 text-gray-700">
                         {order.shippingAddress?.name || "N/A"}
@@ -172,6 +176,8 @@ const Orders = () => {
                               ? "bg-green-100 text-green-700"
                               : order.status === "Processing"
                               ? "bg-yellow-100 text-yellow-700"
+                              : order.status === "Paid"
+                              ? "bg-blue-100 text-blue-700"
                               : "bg-gray-100 text-gray-700"
                           }`}
                         >
@@ -180,6 +186,9 @@ const Orders = () => {
                           )}
                           {order.status === "Processing" && (
                             <Clock className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin-slow" />
+                          )}
+                          {order.status === "Paid" && (
+                            <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
                           )}
                           {order.status}
                         </span>
@@ -203,17 +212,5 @@ const Orders = () => {
     </div>
   );
 };
-
-// Add this CSS in your global stylesheet (e.g., index.css) for animations
-const styles = `
-  @keyframes spin-slow {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .animate-spin-slow {
-    animation: spin-slow 3s linear infinite;
-  }
-`;
 
 export default Orders;
