@@ -1,15 +1,10 @@
-import { createRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client"; // Correct import
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
-import { unregister } from './serviceWorker';
+import React from "react";
 
-const root = createRoot(document.getElementById("root"));
-
-// Unregister service workers
-unregister();
-
-// Render the app
+const root = createRoot(document.getElementById("root")); // Create root
 root.render(
   <BrowserRouter>
     <App />
