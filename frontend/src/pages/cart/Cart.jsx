@@ -4,11 +4,38 @@ import { Trash2, Plus, Minus, ShoppingBag, Lock } from "lucide-react";
 
 const Cart = () => {
   const [cartItems, setCartItems] = useState([]);
+  const [productStocks, setProductStocks] = useState({}); // To store available quantities
 
   useEffect(() => {
     const cart = JSON.parse(localStorage.getItem("cart")) || [];
     setCartItems(cart);
+    
+    // Fetch available quantities for all products in cart
+    fetchProductStocks(cart);
   }, []);
+
+  const fetchProductStocks = async (cartItems) => {
+    try {
+      const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const stocks = {};
+      
+      // Create an array of unique product IDs to fetch
+      const uniqueProductIds = [...new Set(cartItems.map(item => item.id))];
+      
+      // Fetch stock for each product
+      for (const productId of uniqueProductIds) {
+        const response = await fetch(`${backend}/api/videos/stock/${productId}`);
+        if (response.ok) {
+          const data = await response.json();
+          stocks[productId] = data.quantity;
+        }
+      }
+      
+      setProductStocks(stocks);
+    } catch (error) {
+      console.error("Error fetching product stocks:", error);
+    }
+  };
 
   const updateCart = (newCart) => {
     setCartItems(newCart);
@@ -23,8 +50,15 @@ const Cart = () => {
 
   const increaseQuantity = (index) => {
     const updatedCart = [...cartItems];
-    updatedCart[index].quantity = (updatedCart[index].quantity || 1) + 1;
-    updateCart(updatedCart);
+    const item = updatedCart[index];
+    const availableStock = productStocks[item.id] || 0;
+    
+    if ((item.quantity || 1) < availableStock) {
+      updatedCart[index].quantity = (updatedCart[index].quantity || 1) + 1;
+      updateCart(updatedCart);
+    } else {
+      alert(`Cannot add more than available stock (${availableStock})`);
+    }
   };
 
   const decreaseQuantity = (index) => {
@@ -79,74 +113,85 @@ const Cart = () => {
             {/* Cart Items */}
             <div className="lg:w-2/3">
               <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-                {cartItems.map((item, index) => (
-                  <div
-                    key={index}
-                    className="p-4 sm:p-6 border-b border-gray-200 hover:bg-gray-50 transition-all duration-200"
-                  >
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      {/* Product Image/Video */}
-                      <div className="w-24 h-24 flex-shrink-0">
-                        <video
-                          src={item.videoUrl}
-                          className="w-full h-full object-cover rounded-md border border-gray-200"
-                          muted
-                          loop
-                          playsInline
-                          onMouseOver={(e) => e.target.play()}
-                          onMouseOut={(e) => e.target.pause()}
-                        />
-                      </div>
-
-                      {/* Product Details */}
-                      <div className="flex-1 w-full">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-medium text-gray-800">{item.category}</h3>
-                            <p className="text-sm text-gray-600">Size: {item.size}</p>
-                            <p className="text-lg font-semibold text-gray-900 mt-1">
-                              ₹{(item.price || 0).toFixed(2)}
-                            </p>
-                          </div>
-
-                          {/* Quantity Controls */}
-                          <div className="flex items-center mt-3 sm:mt-0">
-                            <button
-                              onClick={() => decreaseQuantity(index)}
-                              className="p-1 border border-gray-300 rounded-l-md hover:bg-gray-100 disabled:opacity-50"
-                              disabled={item.quantity === 1}
-                            >
-                              <Minus className="w-4 h-4 text-gray-600" />
-                            </button>
-                            <span className="px-4 py-1 border-t border-b border-gray-300 text-gray-800 font-medium">
-                              {item.quantity || 1}
-                            </span>
-                            <button
-                              onClick={() => increaseQuantity(index)}
-                              className="p-1 border border-gray-300 rounded-r-md hover:bg-gray-100"
-                            >
-                              <Plus className="w-4 h-4 text-gray-600" />
-                            </button>
-                          </div>
+                {cartItems.map((item, index) => {
+                  const availableStock = productStocks[item.id] || 0;
+                  const isMaxQuantity = (item.quantity || 1) >= availableStock;
+                  
+                  return (
+                    <div
+                      key={index}
+                      className="p-4 sm:p-6 border-b border-gray-200 hover:bg-gray-50 transition-all duration-200"
+                    >
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                        {/* Product Image/Video */}
+                        <div className="w-24 h-24 flex-shrink-0">
+                          <video
+                            src={item.videoUrl}
+                            className="w-full h-full object-cover rounded-md border border-gray-200"
+                            muted
+                            loop
+                            playsInline
+                            onMouseOver={(e) => e.target.play()}
+                            onMouseOut={(e) => e.target.pause()}
+                          />
                         </div>
 
-                        {/* Subtotal and Remove */}
-                        <div className="flex justify-between items-center mt-3">
-                          <span className="text-sm font-medium text-gray-700">
-                            Subtotal: ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
-                          </span>
-                          <button
-                            onClick={() => removeFromCart(index)}
-                            className="text-red-500 hover:text-red-600 flex items-center text-sm font-medium"
-                          >
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Remove
-                          </button>
+                        {/* Product Details */}
+                        <div className="flex-1 w-full">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-medium text-gray-800">{item.category}</h3>
+                              <p className="text-sm text-gray-600">Size: {item.size}</p>
+                              <p className="text-lg font-semibold text-gray-900 mt-1">
+                                ₹{(item.price || 0).toFixed(2)}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                Available: {availableStock}
+                              </p>
+                            </div>
+
+                            {/* Quantity Controls */}
+                            <div className="flex items-center mt-3 sm:mt-0">
+                              <button
+                                onClick={() => decreaseQuantity(index)}
+                                className="p-1 border border-gray-300 rounded-l-md hover:bg-gray-100 disabled:opacity-50"
+                                disabled={item.quantity === 1}
+                              >
+                                <Minus className="w-4 h-4 text-gray-600" />
+                              </button>
+                              <span className="px-4 py-1 border-t border-b border-gray-300 text-gray-800 font-medium">
+                                {item.quantity || 1}
+                              </span>
+                              <button
+                                onClick={() => increaseQuantity(index)}
+                                className={`p-1 border border-gray-300 rounded-r-md hover:bg-gray-100 ${
+                                  isMaxQuantity ? "opacity-50 cursor-not-allowed" : ""
+                                }`}
+                                disabled={isMaxQuantity}
+                              >
+                                <Plus className="w-4 h-4 text-gray-600" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Subtotal and Remove */}
+                          <div className="flex justify-between items-center mt-3">
+                            <span className="text-sm font-medium text-gray-700">
+                              Subtotal: ₹{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                            </span>
+                            <button
+                              onClick={() => removeFromCart(index)}
+                              className="text-red-500 hover:text-red-600 flex items-center text-sm font-medium"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Remove
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
