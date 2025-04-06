@@ -20,13 +20,77 @@
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="./src/assets/logo2.png">
+    <link rel="apple-touch-icon" href="./src/assets/apple-touch-icon.png">
     
     <!-- Preconnect to CDNs for faster loading -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     
     <!-- CSS Resources -->
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    
+    <!-- UPI Payment Handler Script -->
+    <script>
+      // Enhanced UPI Payment Handler with multiple fallbacks
+      document.addEventListener('DOMContentLoaded', function() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isWebView = /(WebView|Android.*AppleWebKit)/i.test(navigator.userAgent);
+        
+        if(isMobile || isWebView) {
+          console.log('Mobile/WebView environment detected - enabling payment handlers');
+          
+          // Handle all payment links
+          document.body.addEventListener('click', function(e) {
+            const paymentLink = e.target.closest('[data-payment-method]');
+            if(!paymentLink) return;
+            
+            e.preventDefault();
+            const method = paymentLink.dataset.paymentMethod;
+            const amount = paymentLink.dataset.amount || '';
+            
+            // UPI Payment Handling
+            if(method === 'upi') {
+              const upiId = paymentLink.dataset.upiId || 'wholesalebaba@upi';
+              const upiLinks = [
+                `upi://pay?pa=${upiId}&am=${amount}&pn=WholesaleBaba`,
+                `paytmmp://pay?pa=${upiId}&am=${amount}&pn=WholesaleBaba`,
+                `tez://upi/pay?pa=${upiId}&am=${amount}`,
+                `phonepe://pay?pa=${upiId}&am=${amount}`
+              ];
+              
+              attemptPaymentMethods(upiLinks, amount);
+            }
+            
+            // Razorpay/Other payment methods can be added similarly
+          });
+          
+          function attemptPaymentMethods(urls, amount, attempt = 0) {
+            if(attempt >= urls.length) {
+              return redirectToWebPayment(amount);
+            }
+            
+            console.log('Attempting payment method:', urls[attempt]);
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = urls[attempt];
+            document.body.appendChild(iframe);
+            
+            setTimeout(() => {
+              document.body.removeChild(iframe);
+              if(!document.hidden) {
+                attemptPaymentMethods(urls, amount, attempt + 1);
+              }
+            }, 800);
+          }
+          
+          function redirectToWebPayment(amount) {
+            console.log('Redirecting to web payment');
+            window.location.href = `https://wholesalebaba.com/payment?amount=${encodeURIComponent(amount)}`;
+          }
+        }
+      });
+    </script>
     
     <!-- Schema.org markup for Google -->
     <script type="application/ld+json">
@@ -37,17 +101,22 @@
       "url": "https://wholesalebaba.com",
       "description": "India's leading wholesale clothing supplier",
       "priceRange": "₹",
+      "openingHours": "Mo,Tu,We,Th,Fr,Sa 09:00-18:00",
+      "telephone": "+919999999999",
       "address": {
         "@type": "PostalAddress",
+        "streetAddress": "123 Fashion Street",
         "addressLocality": "Mumbai",
         "addressRegion": "MH",
         "postalCode": "400001",
         "addressCountry": "IN"
-      }
+      },
+      "paymentAccepted": "Cash, Credit Card, UPI, Bank Transfer"
     }
     </script>
   </head>
-  <body>
+  
+  <body class="min-h-screen bg-gray-50 font-sans">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     
@@ -55,9 +124,37 @@
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js');
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('ServiceWorker registration successful');
+          }).catch(err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
         });
       }
+      
+      // Preload critical resources
+      const preloadImages = [
+        '/src/assets/hero-banner.webp',
+        '/src/assets/featured-products.webp'
+      ];
+      preloadImages.forEach(img => {
+        const link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = img;
+        document.head.appendChild(link);
+      });
     </script>
+    
+    <!-- Noscript fallback -->
+    <noscript>
+      <div class="fixed inset-0 bg-white z-50 flex items-center justify-center p-4">
+        <div class="text-center max-w-md">
+          <h1 class="text-2xl font-bold mb-4">JavaScript Required</h1>
+          <p class="mb-4">For full functionality of our wholesale portal, please enable JavaScript in your browser.</p>
+          <a href="/contact" class="btn btn-primary">Contact Support</a>
+        </div>
+      </div>
+    </noscript>
   </body>
 </html>
