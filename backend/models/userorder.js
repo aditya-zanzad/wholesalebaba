@@ -7,7 +7,7 @@ const OrderSchema = new mongoose.Schema({
   currency: { type: String, required: true },
   status: { 
     type: String, 
-    enum: ["created", "paid", "failed"], 
+    enum: ["created", "cod_pending", "paid", "failed"], 
     default: "created" 
   },
   user_id: { 
