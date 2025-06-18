@@ -101,46 +101,63 @@ const CloudinaryPlayer = () => {
   };
 
   const handleAddToCart = () => {
-    if (videoData.length === 0 || videoData[currentIndex].quantity === 0) return;
+    if (videoData.length === 0 || currentIndex >= videoData.length) return;
+    
+    const currentVideo = videoData[currentIndex];
+    if (currentVideo.quantity <= 0) {
+      alert("This item is out of stock");
+      return;
+    }
 
-    const availableQuantity = videoData[currentIndex].quantity;
+    const availableQuantity = currentVideo.quantity;
     const selectedVideo = {
-      id: videoData[currentIndex].id,
-      videoUrl: videoData[currentIndex].videoUrl,
+      id: currentVideo.id,
+      videoUrl: currentVideo.videoUrl,
       category: selectedCategory,
       size: selectedSize,
-      price: videoData[currentIndex].price,
-      quantity: selectedQuantity,
+      price: currentVideo.price,
+      quantity: Math.min(selectedQuantity, availableQuantity),
+      productId: currentVideo.id // Using the unique MongoDB _id
     };
 
     const existingCart = JSON.parse(localStorage.getItem("cart")) || [];
+    
+    // Check if this exact product is already in cart (using videoUrl as unique identifier)
     const existingItemIndex = existingCart.findIndex(
-      (item) => 
-        item.id === selectedVideo.id &&
-        item.size === selectedVideo.size &&
-        item.category === selectedVideo.category
+      (item) => item.videoUrl === selectedVideo.videoUrl
     );
 
     if (existingItemIndex !== -1) {
-      const newQuantity = existingCart[existingItemIndex].quantity + selectedQuantity;
-      if (newQuantity > availableQuantity) {
+      // Calculate new quantity without exceeding available stock
+      const newQuantity = Math.min(
+        existingCart[existingItemIndex].quantity + selectedQuantity,
+        availableQuantity
+      );
+      
+      if (newQuantity <= existingCart[existingItemIndex].quantity) {
         alert("Cannot add more than available stock");
         return;
       }
+      
       existingCart[existingItemIndex].quantity = newQuantity;
     } else {
+      // Add new item to cart
       existingCart.push(selectedVideo);
     }
 
     localStorage.setItem("cart", JSON.stringify(existingCart));
     setCartCount(existingCart.length);
     setSelectedQuantity(1);
+    
+    // Trigger cart update event for other components
+    window.dispatchEvent(new Event('storage'));
+    
     alert("Added to cart 🛒");
   };
 
   return (
     <div className="reel-container flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
-      {videoData.length > 0 ? (
+      {videoData.length > 0 && currentIndex < videoData.length ? (
         <div className="video-wrapper relative">
           <video
             key={videoData[currentIndex].videoUrl}
@@ -259,7 +276,9 @@ const CloudinaryPlayer = () => {
         </div>
       ) : (
         <p className="text-gray-700">
-          No videos available for {selectedCategory} - Size {selectedSize}.
+          {videoData.length === 0 
+            ? `No videos available for ${selectedCategory} - Size ${selectedSize}.`
+            : "Loading videos..."}
         </p>
       )}
     </div>
