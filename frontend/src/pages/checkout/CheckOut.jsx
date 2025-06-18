@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
-import { Link, useNavigate } from "react-router-dom";
-import { CreditCard, Truck, ShieldCheck, ArrowLeft, Package, Lock, DollarSign } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  CreditCard, 
+  Truck, 
+  ShieldCheck, 
+  ArrowLeft, 
+  Package, 
+  Lock, 
+  DollarSign 
+} from 'lucide-react';
 
 const loadRazorpay = (src) => {
   return new Promise((resolve) => {
-    const script = document.createElement("script");
+    const script = document.createElement('script');
     script.src = src;
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
@@ -16,134 +24,148 @@ const loadRazorpay = (src) => {
 const Checkout = () => {
   const [cartItems, setCartItems] = useState([]);
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    address: "",
-    pincode: "",
-    city: "",
-    state: "",
-    phone: "",
-    paymentMethod: "Online Payment",
+    name: '',
+    email: '',
+    address: '',
+    pincode: '',
+    city: '',
+    state: '',
+    phone: '',
+    paymentMethod: 'Online Payment',
   });
   const [errors, setErrors] = useState({});
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [apiError, setApiError] = useState(null);
   const navigate = useNavigate();
 
+  // Load cart items and set up storage listener
   useEffect(() => {
     const loadCart = () => {
-      const cart = JSON.parse(localStorage.getItem("cart")) || [];
+      const cart = JSON.parse(localStorage.getItem('cart')) || [];
       setCartItems(cart);
     };
 
     loadCart();
 
     const handleStorageChange = (e) => {
-      if (e.key === "cart") {
+      if (e.key === 'cart') {
         loadCart();
       }
     };
 
-    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener('storage', handleStorageChange);
       restoreScroll();
     };
   }, []);
 
   const restoreScroll = () => {
-    document.body.style.overflow = "auto";
-    document.body.style.position = "static";
-    document.body.style.height = "auto";
-    document.body.style.width = "auto";
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'static';
+    document.body.style.height = 'auto';
+    document.body.style.width = 'auto';
   };
 
-  const calculateSubtotal = () =>
-    parseFloat(cartItems.reduce((total, item) => total + (item.price || 0) * (item.quantity || 1), 0)).toFixed(2);
+  // Calculate order totals
+  const calculateSubtotal = () => 
+    parseFloat(cartItems.reduce((total, item) => 
+      total + (item.price || 0) * (item.quantity || 1), 0)).toFixed(2);
 
   const calculateShippingCharges = () => {
     const orderValue = parseFloat(calculateSubtotal());
     return orderValue < 2000 ? 140 : 140 + Math.floor((orderValue - 2000) / 500) * 30;
   };
 
-  const calculateTotal = () => (parseFloat(calculateSubtotal()) + calculateShippingCharges()).toFixed(2);
+  const calculateTotal = () => 
+    (parseFloat(calculateSubtotal()) + calculateShippingCharges()).toFixed(2);
 
+  // Handle form changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+    
     if (errors[name]) {
-      setErrors({ ...errors, [name]: "" });
+      setErrors({ ...errors, [name]: '' });
     }
+    
     if (apiError) {
       setApiError(null);
     }
   };
 
+  // Form validation
   const validateForm = () => {
     const newErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (!formData.name.trim()) newErrors.name = "Full Name is required";
-    else if (formData.name.trim().length < 3) newErrors.name = "Name must be at least 3 characters";
+    if (!formData.name.trim()) newErrors.name = 'Full Name is required';
+    else if (formData.name.trim().length < 3) newErrors.name = 'Name must be at least 3 characters';
 
-    if (!formData.email.trim()) newErrors.email = "Email is required";
-    else if (!emailRegex.test(formData.email)) newErrors.email = "Please enter a valid email";
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!emailRegex.test(formData.email)) newErrors.email = 'Please enter a valid email';
 
-    if (!formData.address.trim()) newErrors.address = "Address is required";
-    else if (formData.address.trim().length < 10) newErrors.address = "Address must be at least 10 characters";
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    else if (formData.address.trim().length < 10) newErrors.address = 'Address must be at least 10 characters';
 
-    if (!formData.pincode) newErrors.pincode = "Pincode is required";
-    else if (!/^\d{6}$/.test(formData.pincode)) newErrors.pincode = "Pincode must be 6 digits";
+    if (!formData.pincode) newErrors.pincode = 'Pincode is required';
+    else if (!/^\d{6}$/.test(formData.pincode)) newErrors.pincode = 'Pincode must be 6 digits';
 
-    if (!formData.city.trim()) newErrors.city = "City is required";
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state.trim()) newErrors.state = 'State is required';
 
-    if (!formData.state.trim()) newErrors.state = "State is required";
-
-    if (!formData.phone) newErrors.phone = "Phone number is required";
-    else if (!/^\d{10}$/.test(formData.phone)) newErrors.phone = "Phone must be 10 digits";
+    if (!formData.phone) newErrors.phone = 'Phone number is required';
+    else if (!/^\d{10}$/.test(formData.phone)) newErrors.phone = 'Phone must be 10 digits';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Clear purchased items from cart
   const clearPurchasedItemsFromCart = (purchasedItems) => {
     try {
-      const currentCart = JSON.parse(localStorage.getItem("cart")) || [];
-      const purchasedItemIds = new Set(purchasedItems.map((item) => item.videoUrl));
-      const updatedCart = currentCart.filter((item) => !purchasedItemIds.has(item.videoUrl));
-      localStorage.setItem("cart", JSON.stringify(updatedCart));
+      const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
+      const purchasedItemUrls = new Set(purchasedItems.map((item) => item.videoUrl));
+      const updatedCart = currentCart.filter((item) => !purchasedItemUrls.has(item.videoUrl));
+      
+      localStorage.setItem('cart', JSON.stringify(updatedCart));
       setCartItems(updatedCart);
+      window.dispatchEvent(new Event('cart-updated'));
+      
       return updatedCart;
     } catch (error) {
-      console.error("Error clearing cart:", error);
+      console.error('Error clearing cart:', error);
       return null;
     }
   };
 
+  // Handle payment submission
   const handlePayment = async () => {
     if (isProcessingPayment) return;
 
-    const currentCart = JSON.parse(localStorage.getItem("cart")) || [];
+    // Validate cart hasn't changed
+    const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
     if (currentCart.length !== cartItems.length) {
-      setApiError("Your cart has changed. Please review your items before payment.");
+      setApiError('Your cart has changed. Please review your items before payment.');
       setCartItems(currentCart);
       return;
     }
 
+    // Validate form
     if (!validateForm()) {
       const firstErrorField = Object.keys(errors)[0];
       if (firstErrorField) {
         document.querySelector(`[name="${firstErrorField}"]`)?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
+          behavior: 'smooth',
+          block: 'center',
         });
       }
       return;
     }
 
     if (cartItems.length === 0) {
-      alert("Your cart is empty. Please add items to proceed.");
+      alert('Your cart is empty. Please add items to proceed.');
       return;
     }
 
@@ -151,25 +173,28 @@ const Checkout = () => {
     setApiError(null);
 
     try {
-      const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+      const backend = import.meta.env.VITE_BACKEND_URL;
       const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
-      const userId = localStorage.getItem("userId");
-      if (!userId) throw new Error("Please login to continue");
-      if (!razorpayKey && formData.paymentMethod === "Online Payment") throw new Error("Payment gateway key missing");
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) throw new Error('Please login to continue');
+      if (!backend) throw new Error('Backend URL is not configured');
 
       const totalAmount = calculateTotal();
-      if (isNaN(totalAmount) || totalAmount <= 0) throw new Error("Invalid order amount");
+      if (isNaN(totalAmount) || totalAmount <= 0) throw new Error('Invalid order amount');
 
       const transactionItems = [...cartItems];
 
-      if (formData.paymentMethod === "Online Payment") {
-        const razorpayLoaded = await loadRazorpay("https://checkout.razorpay.com/v1/checkout.js");
-        if (!razorpayLoaded) throw new Error("Failed to load payment gateway. Please try again.");
+      if (formData.paymentMethod === 'Online Payment') {
+        if (!razorpayKey) throw new Error('Payment gateway key missing');
+
+        const razorpayLoaded = await loadRazorpay('https://checkout.razorpay.com/v1/checkout.js');
+        if (!razorpayLoaded) throw new Error('Failed to load payment gateway. Please try again.');
 
         const { data } = await axios.post(
           `${backend}/api/payment/create-order`,
           {
-            amount: (totalAmount * 100).toString(),
+            amount: (totalAmount * 100).toString(), // Convert to paise
             user_id: userId,
             products: transactionItems.map((item) => ({
               videoUrl: item.videoUrl,
@@ -191,19 +216,20 @@ const Checkout = () => {
           { timeout: 10000 }
         );
 
-        if (!data?.id) throw new Error("Invalid response from payment gateway");
+        if (!data?.id) throw new Error('Invalid response from payment gateway');
 
-        document.body.style.overflow = "hidden";
-        document.body.style.position = "fixed";
-        document.body.style.width = "100%";
-        document.body.style.height = "100%";
+        // Lock scroll for payment modal
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
 
         const options = {
           key: razorpayKey,
           amount: data.amount,
-          currency: data.currency || "INR",
-          name: "Wholesale Baba",
-          description: "Product Purchase",
+          currency: data.currency || 'INR',
+          name: 'Wholesale Baba',
+          description: 'Product Purchase',
           order_id: data.id,
           handler: async (response) => {
             try {
@@ -220,9 +246,9 @@ const Checkout = () => {
               restoreScroll();
               navigate(`/order-confirmation/${data.id}`);
             } catch (error) {
-              console.error("Confirmation failed:", error);
+              console.error('Confirmation failed:', error);
               restoreScroll();
-              setApiError("Payment succeeded but confirmation failed. Please contact support with order ID: " + data.id);
+              setApiError('Payment succeeded but confirmation failed. Please contact support with order ID: ' + data.id);
             } finally {
               setIsProcessingPayment(false);
             }
@@ -232,29 +258,29 @@ const Checkout = () => {
             email: formData.email,
             contact: formData.phone,
           },
-          theme: { color: "#2874f0" },
+          theme: { color: '#2874f0' },
           modal: {
             ondismiss: () => {
               restoreScroll();
               setIsProcessingPayment(false);
-              setApiError("Payment was cancelled. You can try again.");
+              setApiError('Payment was cancelled. You can try again.');
             },
           },
         };
 
         const rzp = new window.Razorpay(options);
-        rzp.on("payment.failed", (response) => {
+        rzp.on('payment.failed', (response) => {
           restoreScroll();
           setIsProcessingPayment(false);
-          console.error("Payment failed:", response.error);
+          console.error('Payment failed:', response.error);
           setApiError(`Payment failed: ${response.error.description}. Please try again.`);
         });
         rzp.open();
-      } else if (formData.paymentMethod === "Cash on Delivery") {
+      } else if (formData.paymentMethod === 'Cash on Delivery') {
         const { data } = await axios.post(
           `${backend}/api/order/create-cod-order`,
           {
-            amount: (totalAmount * 100).toString(),
+            amount: (totalAmount * 100).toString(), // Convert to paise
             user_id: userId,
             products: transactionItems.map((item) => ({
               videoUrl: item.videoUrl,
@@ -273,38 +299,50 @@ const Checkout = () => {
               phone: formData.phone,
             },
           },
-          { timeout: 10000 }
+          { 
+            timeout: 15000,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
         );
 
-        if (!data?.order?.order_id) throw new Error("Failed to create COD order");
-
+        if (!data?.success || !data?.order?.order_id) {
+          throw new Error(data?.message || 'Failed to create COD order');
+        }
 
         clearPurchasedItemsFromCart(transactionItems);
         navigate(`/order-confirmation/${data.order.order_id}`);
       }
     } catch (error) {
-      console.error("Payment error:", error);
+      console.error('Payment error:', error);
       restoreScroll();
       setIsProcessingPayment(false);
-      let errorMessage = "Operation failed. Please try again.";
+      
+      let errorMessage = 'Operation failed. Please try again.';
       if (error.response) {
-        errorMessage = error.response.status === 500
-          ? "Server error. Please try again later."
-          : error.response.data?.message || errorMessage;
+        errorMessage = error.response.data?.message || errorMessage;
+        
+        if (error.response.data?.code === 'INSUFFICIENT_STOCK') {
+          errorMessage = 'Some items in your cart are out of stock. Please update your cart.';
+          // Refresh cart to reflect current stock
+          const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
+          setCartItems(currentCart);
+        }
       } else if (error.request) {
-        errorMessage = "Network error. Please check your connection.";
-      } else {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.message) {
         errorMessage = error.message;
       }
+      
       setApiError(errorMessage);
-    } finally {
-      setIsProcessingPayment(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between">
             <Link to="/cart" className="flex items-center text-blue-600 hover:text-blue-800">
@@ -319,6 +357,7 @@ const Checkout = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left Section - Delivery Details */}
           <div className="lg:w-2/3">
             <div className="bg-white shadow-sm rounded-lg p-6 mb-6">
               <div className="flex items-center mb-6">
@@ -336,12 +375,13 @@ const Checkout = () => {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    className={`w-full p-3 border ${errors.name ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter your full name"
                     required
                   />
                   {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                 </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
@@ -349,12 +389,13 @@ const Checkout = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full p-3 border ${errors.email ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter your email"
                     required
                   />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                 </div>
+                
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
                   <input
@@ -362,12 +403,13 @@ const Checkout = () => {
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    className={`w-full p-3 border ${errors.address ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter your full address"
                     required
                   />
                   {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
                 </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
                   <input
@@ -376,12 +418,13 @@ const Checkout = () => {
                     value={formData.pincode}
                     onChange={handleChange}
                     maxLength="6"
-                    className={`w-full p-3 border ${errors.pincode ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter 6-digit pincode"
                     required
                   />
                   {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
                 </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
                   <input
@@ -389,12 +432,13 @@ const Checkout = () => {
                     name="city"
                     value={formData.city}
                     onChange={handleChange}
-                    className={`w-full p-3 border ${errors.city ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.city ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter your city"
                     required
                   />
                   {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
                 </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
                   <input
@@ -402,12 +446,13 @@ const Checkout = () => {
                     name="state"
                     value={formData.state}
                     onChange={handleChange}
-                    className={`w-full p-3 border ${errors.state ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.state ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter your state"
                     required
                   />
                   {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state}</p>}
                 </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
                   <input
@@ -416,7 +461,7 @@ const Checkout = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     maxLength="10"
-                    className={`w-full p-3 border ${errors.phone ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    className={`w-full p-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
                     placeholder="Enter 10-digit phone number"
                     required
                   />
@@ -424,6 +469,7 @@ const Checkout = () => {
                 </div>
               </div>
 
+              {/* Payment Method Selection */}
               <div className="mt-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <CreditCard className="w-5 h-5 text-blue-600 mr-2" />
@@ -436,7 +482,7 @@ const Checkout = () => {
                       id="onlinePayment"
                       name="paymentMethod"
                       value="Online Payment"
-                      checked={formData.paymentMethod === "Online Payment"}
+                      checked={formData.paymentMethod === 'Online Payment'}
                       onChange={handleChange}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                     />
@@ -450,7 +496,7 @@ const Checkout = () => {
                       id="cashOnDelivery"
                       name="paymentMethod"
                       value="Cash on Delivery"
-                      checked={formData.paymentMethod === "Cash on Delivery"}
+                      checked={formData.paymentMethod === 'Cash on Delivery'}
                       onChange={handleChange}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                     />
@@ -459,7 +505,7 @@ const Checkout = () => {
                     </label>
                   </div>
                 </div>
-                {formData.paymentMethod === "Cash on Delivery" && (
+                {formData.paymentMethod === 'Cash on Delivery' && (
                   <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                     <p className="text-sm text-yellow-700">
                       Please have exact change ready. Our delivery executive will collect ₹{calculateTotal()} when your order is delivered.
@@ -470,12 +516,14 @@ const Checkout = () => {
             </div>
           </div>
 
+          {/* Right Section - Order Summary */}
           <div className="lg:w-1/3">
             <div className="bg-white shadow-sm rounded-lg p-6 sticky top-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
                 <Package className="w-6 h-6 text-blue-600 mr-2" />
                 Order Summary
               </h2>
+              
               <div className="space-y-4 border-b pb-4">
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal ({cartItems.length} items)</span>
@@ -486,22 +534,29 @@ const Checkout = () => {
                   <span>₹{calculateShippingCharges()}</span>
                 </div>
               </div>
+              
               <div className="flex justify-between text-lg font-semibold mt-4">
                 <span>Total Amount</span>
                 <span className="text-blue-600">₹{calculateTotal()}</span>
               </div>
+              
               {apiError && (
                 <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
                   {apiError}
                 </div>
               )}
+              
               <div className="mt-6">
                 <button
                   onClick={handlePayment}
                   disabled={isProcessingPayment}
                   className={`w-full py-3 ${
-                    isProcessingPayment ? "bg-yellow-500" : "bg-yellow-400"
-                  } text-gray-800 font-semibold rounded-md hover:bg-yellow-500 transition-colors flex items-center justify-center shadow-md`}
+                    isProcessingPayment 
+                      ? 'bg-yellow-500' 
+                      : formData.paymentMethod === 'Cash on Delivery' 
+                        ? 'bg-green-500 hover:bg-green-600' 
+                        : 'bg-yellow-400 hover:bg-yellow-500'
+                  } text-gray-800 font-semibold rounded-md transition-colors flex items-center justify-center shadow-md`}
                 >
                   {isProcessingPayment ? (
                     <>
@@ -522,8 +577,12 @@ const Checkout = () => {
                     </>
                   ) : (
                     <>
-                      <Lock className="w-5 h-5 mr-2" />
-                      {formData.paymentMethod === "Cash on Delivery" ? "Place COD Order" : "Proceed to Payment"}
+                      {formData.paymentMethod === 'Cash on Delivery' ? (
+                        <DollarSign className="w-5 h-5 mr-2" />
+                      ) : (
+                        <Lock className="w-5 h-5 mr-2" />
+                      )}
+                      {formData.paymentMethod === 'Cash on Delivery' ? 'Place COD Order' : 'Proceed to Payment'}
                     </>
                   )}
                 </button>
