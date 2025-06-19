@@ -1,1185 +1,601 @@
-import express from "express";
-import cors from "cors";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import User from "../models/user.js";
-import Video from "../models/video.js";
-import dotenv from "dotenv";
-import axios from "axios";
-import nodemailer from "nodemailer";
-import Razorpay from "razorpay";
-import Order from "../models/userorder.js"; // ✅ Use require for CommonJS
-import mongoose from "mongoose";
-import Category from "../models/category.js";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+  CreditCard, 
+  Truck, 
+  ShieldCheck, 
+  ArrowLeft, 
+  Package, 
+  Lock, 
+  DollarSign 
+} from 'lucide-react';
 
-
-
-// Load environment variables from .env file
-dotenv.config();
-
-const router = express.Router();
-router.use(cors());
-
-const JWT_SECRET = process.env.JWT_SECRET; // Ensure this is set in your .env file
-
-// ✅ Middleware to protect routes
-const authenticate = (req, res, next) => {
-  const token = req.header("Authorization");
-
-  if (!token) {
-    return res.status(401).json({ message: "No token, authorization denied" });
-  }
-
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded.userId; // Attach user ID to the request
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Token is not valid" });
-  }
+const loadRazorpay = (src) => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
 };
 
-// ✅ Login User (Optimized)
-router.post("/api/auth/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    // Optimized query with lean() and indexed email field
-    const user = await User.findOne({ email }).lean();
-    if (!user) {
-      return res.status(400).json({ message: "User not found" });
-    }
-
-    if (!user.verified){
-      return res.status(400).json({ message: "User not verified" });
-    }
-
-    // Parallelize password validation and token generation
-    const [isPasswordValid, token] = await Promise.all([
-      bcrypt.compare(password, user.password),
-      jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1h" })
-    ]);
-
-    if (!isPasswordValid) {
-      return res.status(400).json({ message: "Invalid password" });
-    }
-
-    res.status(200).json({ token, role: user.role , userId: user._id , name: user.name});
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// ✅ Register User (Optimized)
-router.post("/api/auth/register", async (req, res) => {
-  try {
-    const { name, email, password, city } = req.body;
-
-    // Validate required fields
-    if (!name || !email || !password || !city) {
-      return res.status(400).json({ message: "All fields (name, email, password, city) are required" });
-    }
-
-    // Optimized existence check with lean()
-    const existingUser = await User.findOne({ email }).lean();
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already exists" });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create new user with all fields
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      city, // Include the city field
-    });
-
-    // Respond with minimal data (avoid sending sensitive info like password)
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: newUser._id,
-        name: newUser.name,
-        email: newUser.email,
-        city: newUser.city,
-        role: newUser.role,
-        createdAt: newUser.createdAt,
-      },
-    });
-  } catch (error) {
-    console.error("Error creating user:", error);
-    // Handle specific Mongoose validation errors
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-
-// ✅ Update User
-router.put("/api/auth/users/:id", authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, email, password } = req.body;
-
-    // Ensure user can only update their own account
-    if (req.user !== id) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-
-    // Find user and update
-    const updatedData = {};
-    if (name) updatedData.name = name;
-    if (email) updatedData.email = email;
-    if (password) {
-      const hashedPassword = await bcrypt.hash(password, 10);
-      updatedData.password = hashedPassword;
-    }
-
-    const updatedUser = await User.findByIdAndUpdate(id, updatedData, { new: true });
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json(updatedUser);
-  } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// ✅ Delete User
-router.delete("/api/auth/users/:id", authenticate, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Ensure user can only delete their own account
-    if (req.user !== id) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-
-    const deletedUser = await User.findByIdAndDelete(id);
-
-    if (!deletedUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({ message: "User deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting user:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// ✅ Protected Route Example (Only Accessible with Valid JWT)
-router.get("/api/protected", authenticate, async (req, res) => {
-  try {
-    const user = await User.findById(req.user); // Get user from the decoded token
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    res.json({ message: "Protected route accessed", user });
-  } catch (error) {
-    console.error("Error accessing protected route:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-
-router.get("/api/cloudinary/videos/:category/:size", async (req, res) => {
-  const { category, size } = req.params; // Extract category & size from URL
-
-
-  const cloudName = process.env.REACT_APP_CLOUD_NAME;
-const apiKey = process.env.REACT_APP_CLOUDINARY_API_KEY;
-const apiSecret = process.env.REACT_APP_CLOUDINARY_API_SECRET;
-
-  const baseURL = `https://api.cloudinary.com/v1_1/${cloudName}/resources/video/upload`;
-
-  try {
-    const response = await axios.get(baseURL, {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`,
-      },
-      params: {
-        max_results: 50, // Fetch more results
-        tags: true, // Ensure tags are included in the response
-      },
-    });
-
-    // Filter videos based on Category first, then Size
-    const filteredVideos = response.data.resources.filter(video => 
-      video.tags && video.tags.includes(category) && video.tags.includes(size)
-    );
-
-    const videoUrls = filteredVideos.map(video => 
-      `https://res.cloudinary.com/${cloudName}/video/upload/${video.public_id}.${video.format}`
-    );
-
-    res.json(videoUrls);
-  } catch (error) {
-    console.error("Error fetching videos from Cloudinary:", error.response?.data || error.message);
-    res.status(500).json({ error: "Failed to fetch videos from Cloudinary" });
-  }
-});
-
-router.post("/api/videos/upload", async (req, res) => {
-  try {
-    const { videoUrl, category, size, price, quantity } = req.body;
-
-    // 🔹 Validation
-    if (!videoUrl || !category || !size || !price || !quantity) {
-      return res.status(400).json({ error: "All fields required" });
-    }
-
-    const parsedQuantity = parseInt(quantity, 10);
-    if (isNaN(parsedQuantity) || parsedQuantity < 1) {
-      return res.status(400).json({ message: "Invalid quantity" });
-    }
-
-    // 🔹 Update operation
-    const result = await Video.findOneAndUpdate(
-      { videoUrl, category, size, price },
-      {
-        $inc: { quantity: parsedQuantity }, // ✅ Correctly increments quantity
-        $setOnInsert: {
-          videoUrl,
-          category,
-          size,
-          price,
-          createdAt: new Date(),
-        },
-        $set: { updatedAt: new Date() },
-      },
-      {
-        new: true,
-        upsert: true, // ✅ Creates new entry if not found
-        runValidators: true,
-        setDefaultsOnInsert: true,
-      }
-    );
-
-    res.status(201).json({
-      message: result.createdAt?.getTime() === result.updatedAt?.getTime() 
-        ? "New product added" 
-        : "Stock updated",
-      video: result
-    });
-
-  } catch (error) {
-    console.error("Error:", error);
-    const statusCode = error.code === 11000 ? 409 : 500;
-    res.status(statusCode).json({
-      error: error.code === 11000 
-        ? "Duplicate product" 
-        : "Server error"
-    });
-  }
-});
-
-
-
-
-router.get("/api/videos/data/:category/:size", async (req, res) => {
-  try {
-    const { category, size } = req.params;
-
-    const videos = await Video.find({ category, size });
-
-    if (!videos || videos.length === 0) {
-      return res.status(404).json({ error: "No videos found for the given category and size" });
-    }
-
-    const videoData = videos.map(video => ({
-      id: video._id,
-      videoUrl: video.videoUrl,
-      price: video.price,
-      quantity: video.quantity
-    }));
-
-    res.json({ videoData });
-  } catch (error) {
-    console.error("Error fetching videos and price:", error);
-    res.status(500).json({ error: "Server Error!" });
-  }
-});
-
- /// fetch all users
-
- router.get("/api/users", async (req, res) => {
-  try {
-    const users = await User.find();
-    res.json({ success: true, users });
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// verified user
-router.get("/api/auth/verified-users", async (req, res) => {
-  try {
-    const verifiedUsers = await User.find({ verified: true }); // Fetch only verified users
-
-    if (!verifiedUsers.length) {
-      return res.status(404).json({ message: "No verified users found" });
-    }
-
-    res.json({ success: true, users: verifiedUsers });
-  } catch (error) {
-    console.error("Error fetching verified users:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-router.put("/:id/verify", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { verified } = req.body;
-
-    // Find user by ID
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    // Update verification status
-    user.verified = verified;
-    await user.save();
-
-    res.json({ message: "User verification status updated", user });
-  } catch (error) {
-    console.error("Error updating verification:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-const FRONTEND_URL = process.env.FRONTEND_URL;
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
-
-// Forgot Password Route
-router.post("/api/auth/forgot-password", async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1h" });
-        const link = `${FRONTEND_URL}/reset-password?token=${token}`;
-
-        const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: {
-                user: EMAIL_USER,
-                pass: EMAIL_PASS
-            }
-        });
-
-        const mailOptions = {
-            from: EMAIL_USER,
-            to: email,
-            subject: "Password Reset Request",
-            text: `Click on the link to reset your password: ${link}`
-        };
-
-        await transporter.sendMail(mailOptions);
-        res.json({ message: "Password reset link sent to email" });
-    } catch (error) {
-        console.error("Error sending password reset email:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-});
-
-// Reset Password Route
-router.post("/reset-password", async (req, res) => {
-    try {
-        const { token, newPassword } = req.body;
-        const decoded = jwt.verify(token, JWT_SECRET);
-
-        const user = await User.findById(decoded.userId);
-        if (!user) {
-            return res.status(400).json({ message: "Invalid or expired token" });
-        }
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        user.password = hashedPassword;
-        await user.save();
-
-        res.json({ message: "Password has been reset successfully" });
-    } catch (error) {
-        res.status(500).json({ message: "Invalid or expired token" });
-    }
-});
-
-// DELETE /api/videos/:videoId
-router.delete("/api/videos/:videoId", async (req, res) => {
-  try {
-    const { videoId } = req.params;
-
-    // Validate videoId
-    if (!mongoose.Types.ObjectId.isValid(videoId)) {
-      return res.status(400).json({ success: false, message: "Invalid video ID" });
-    }
-
-    // Find and delete the video
-    const deletedVideo = await Video.findByIdAndDelete(videoId);
-    if (!deletedVideo) {
-      return res.status(404).json({ success: false, message: "Video not found" });
-    }
-
-    // Optional: Delete associated file from storage (e.g., AWS S3)
-    // await deleteFileFromStorage(deletedVideo.videoUrl);
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Video deleted successfully", 
-      data: { videoId: deletedVideo._id }
-    });
-  } catch (error) {
-    console.error("Error deleting video:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error while deleting video",
-      error: error.message 
-    });
-  }
-});
-
-// GET /api/videos/all
-router.get("/api/videos/all", async (req, res) => {
-  try {
-    // Fetch all videos with pagination
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
-    const videos = await Video.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Video.countDocuments();
-
-    if (!videos || videos.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "No videos found" 
-      });
-    }
-
-    const videoData = videos.map(video => ({
-      id: video._id,
-      videoUrl: video.videoUrl,
-      category: video.category,
-      size: video.size,
-      price: video.price,
-      createdAt: video.createdAt,
-      quantity: video.quantity
-    }));
-
-    res.status(200).json({
-      success: true,
-      data: videoData,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching videos:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Server error while fetching videos",
-      error: error.message 
-    });
-  }
-});
-
-// payment routes
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
-
-/*router.post("/api/payment/create-order", async (req, res) => {
-  try {
-    console.log("📩 Incoming Request Body:", req.body);
-
-    const { amount, user_id } = req.body;
-
-    // ✅ Validate user_id
-    if (!user_id || !mongoose.Types.ObjectId.isValid(user_id)) {
-      return res.status(400).json({ message: "Invalid or missing user_id" });
-    }
-
-    // ✅ Validate amount
-    if (!amount || isNaN(amount) || amount <= 0) {
-      return res.status(400).json({ message: "Invalid amount" });
-    }
-
-    const options = {
-      amount: amount, // Already in paise
-      currency: "INR",
-      receipt: `order_rcptid_${Date.now()}`,
+const Checkout = () => {
+  const [cartItems, setCartItems] = useState([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    address: '',
+    pincode: '',
+    city: '',
+    state: '',
+    phone: '',
+    paymentMethod: 'Online Payment',
+  });
+  const [errors, setErrors] = useState({});
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const navigate = useNavigate();
+
+  // Load cart items and set up storage listener
+  useEffect(() => {
+    const loadCart = () => {
+      const cart = JSON.parse(localStorage.getItem('cart')) || [];
+      setCartItems(cart);
     };
 
-    console.log("🛒 Creating Razorpay order with:", options);
+    loadCart();
 
-    const order = await razorpay.orders.create(options);
-    if (!order) {
-      return res.status(500).json({ message: "Order creation failed" });
-    }
+    const handleStorageChange = (e) => {
+      if (e.key === 'cart') {
+        loadCart();
+      }
+    };
 
-    console.log("✅ Razorpay Order Created:", order);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      restoreScroll();
+    };
+  }, []);
+
+  const restoreScroll = () => {
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'static';
+    document.body.style.height = 'auto';
+    document.body.style.width = 'auto';
+  };
+
+  // Calculate order totals
+  const calculateSubtotal = () => 
+    parseFloat(cartItems.reduce((total, item) => 
+      total + (item.price || 0) * (item.quantity || 1), 0)).toFixed(2);
+
+  const calculateShippingCharges = () => {
+    const orderValue = parseFloat(calculateSubtotal());
+    return orderValue < 2000 ? 140 : 140 + Math.floor((orderValue - 2000) / 500) * 30;
+  };
+
+  const calculateTotal = () => 
+    (parseFloat(calculateSubtotal()) + calculateShippingCharges()).toFixed(2);
+
+  // Handle form changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
     
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
+    }
+    
+    if (apiError) {
+      setApiError(null);
+    }
+  };
 
-    // ✅ Save order to MongoDB with valid user_id
+  // Form validation
+  const validateForm = () => {
+    const newErrors = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!formData.name.trim()) newErrors.name = 'Full Name is required';
+    else if (formData.name.trim().length < 3) newErrors.name = 'Name must be at least 3 characters';
+
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    else if (!emailRegex.test(formData.email)) newErrors.email = 'Please enter a valid email';
+
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    else if (formData.address.trim().length < 10) newErrors.address = 'Address must be at least 10 characters';
+
+    if (!formData.pincode) newErrors.pincode = 'Pincode is required';
+    else if (!/^\d{6}$/.test(formData.pincode)) newErrors.pincode = 'Pincode must be 6 digits';
+
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state.trim()) newErrors.state = 'State is required';
+
+    if (!formData.phone) newErrors.phone = 'Phone number is required';
+    else if (!/^\d{10}$/.test(formData.phone)) newErrors.phone = 'Phone must be 10 digits';
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Clear purchased items from cart
+  const clearPurchasedItemsFromCart = (purchasedItems) => {
     try {
-      const newOrder = new Order({
-        order_id: order.id,
-        amount: order.amount,
-        currency: order.currency,
-        user_id: new mongoose.Types.ObjectId(user_id),
-        products: products
-      });
-  
-      await newOrder.save();
-      console.log("✅ Order saved in database:", newOrder);
-    } catch (dbError) {
-      console.error("❌ Database Error:", dbError);
-      return res.status(500).json({ message: "Database error", error: dbError.message });
-    }
-
-    return res.status(200).json(order);
-  } catch (error) {
-    console.error("❌ Razorpay API Error:", error);
-    return res.status(500).json({ message: "Payment failed", error: error.message });
-  }
-});
-
-router.post("/api/payment/confirm", async (req, res) => {
-  try {
-    const { order_id, payment_id } = req.body;
-
-    const updatedOrder = await Order.findOneAndUpdate(
-      { order_id },
-      { 
-        $set: { 
-          status: 'paid',
-          payment_id,
-          updatedAt: new Date()
-        }
-      },
-      { new: true }
-    );
-
-    if (!updatedOrder) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    res.json({ success: true, order: updatedOrder });
-  } catch (error) {
-    console.error("Error confirming payment:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// fetch the order from the database by the user_id
-
-router.get("/api/orders/:user_id", async (req, res) => {
-  try {
-    const { user_id } = req.params;
-
-    // Validate user_id
-    if (!mongoose.Types.ObjectId.isValid(user_id)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
-
-    // Fetch all orders for the given user_id
-    const orders = await Order.find({ user_id });
-
-    if (!orders.length) {
-      return res.status(404).json({ message: "No orders found for this user" });
-    }
-
-    return res.status(200).json(orders);
-  } catch (error) {
-    console.error("❌ Error fetching orders:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
-  }
-});*/
-
-router.post("/api/payment/create-order", async (req, res) => {
-  try {
-    const { amount, user_id, products, shippingAddress } = req.body;
-
-    if (!mongoose.Types.ObjectId.isValid(user_id)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
-
-    // Check product availability
-    for (const product of products) {
-      const video = await Video.findOne({
-        category: product.category,
-        size: product.size,
-        price: product.price,
-      });
-      if (!video || video.quantity < 1) {
-        return res.status(400).json({ message: `Product out of stock: ${product.category} ${product.size}` });
-      }
-    }
-
-    const order = await razorpay.orders.create({
-      amount: Math.round(amount),
-      currency: "INR",
-      receipt: `order_${Date.now()}`,
-    });
-
-    const newOrder = await Order.create({
-      order_id: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      user_id: new mongoose.Types.ObjectId(user_id),
-      products,
-      status: "created",
-      shippingAddress,
-    });
-
-    res.status(201).json(order);
-  } catch (error) {
-    console.error("Order creation error:", error);
-    res.status(500).json({ message: "Order creation failed" });
-  }
-});
-
-// Confirm Payment
-router.post("/api/payment/confirm", async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const { order_id, payment_id } = req.body;
-
-    // 1. Find and validate the order
-    const order = await Order.findOne({ order_id }).session(session);
-    if (!order) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    // 2. Check if already processed
-    if (order.status === "paid") {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(200).json({ success: true, order });
-    }
-
-    // 3. Update order status atomically
-    const updatedOrder = await Order.findOneAndUpdate(
-      { order_id, status: { $ne: "paid" } }, // Prevent race condition
-      { 
-        $set: { 
-          payment_id,
-          status: "paid",
-          updatedAt: new Date(),
-        }
-      },
-      { new: true, session }
-    );
-
-    if (!updatedOrder) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(409).json({ message: "Order status changed concurrently" });
-    }
-
-    // 4. Prepare atomic inventory updates
-    const bulkOps = updatedOrder.products.map(product => {
-      const quantity = Math.max(1, Number(product.quantity) || 1);
+      const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
+      const purchasedItemUrls = new Set(purchasedItems.map((item) => item.videoUrl));
+      const updatedCart = currentCart.filter((item) => !purchasedItemUrls.has(item.videoUrl));
       
-      return {
-        updateOne: {
-          filter: {
-            category: product.category,
-            size: product.size,
-            price: product.price,
-            quantity: { $gte: quantity } // Atomic stock check
-          },
-          update: {
-            $inc: { quantity: -quantity }, // Atomic decrement
-            $set: { updatedAt: new Date() }
-          }
-        }
-      };
-    });
+      localStorage.setItem('cart', JSON.stringify(updatedCart));
+      setCartItems(updatedCart);
+      window.dispatchEvent(new Event('cart-updated'));
+      
+      return updatedCart;
+    } catch (error) {
+      console.error('Error clearing cart:', error);
+      return null;
+    }
+  };
 
-    // 5. Execute atomic inventory updates
-    const bulkResult = await Video.bulkWrite(bulkOps, { session });
-    
-    // 6. Verify all inventory updates succeeded
-    if (bulkResult.modifiedCount !== updatedOrder.products.length) {
-      const failedUpdates = updatedOrder.products.length - bulkResult.modifiedCount;
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(409).json({
-        message: `${failedUpdates} item(s) out of stock or not found`,
-        code: "INSUFFICIENT_STOCK"
-      });
+  // Handle payment submission
+  const handlePayment = async () => {
+    if (isProcessingPayment) return;
+
+    // Validate cart hasn't changed
+    const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
+    if (currentCart.length !== cartItems.length) {
+      setApiError('Your cart has changed. Please review your items before payment.');
+      setCartItems(currentCart);
+      return;
     }
 
-    // 7. Final commit
-    await session.commitTransaction();
-    session.endSession();
-
-    res.json({ 
-      success: true, 
-      order: updatedOrder.toObject(),
-      inventoryUpdate: {
-        matched: bulkResult.matchedCount,
-        modified: bulkResult.modifiedCount
-      }
-    });
-
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("Payment confirmation error:", error);
-    res.status(500).json({ 
-      message: "Payment processing failed",
-      code: "SERVER_ERROR",
-      error: process.env.NODE_ENV === "development" ? error.message : undefined
-    });
-  }
-});
-
-
-
-router.get("/api/orders/user/:userId", async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    // ✅ Validate userId
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: "Invalid user ID" });
-    }
-
-    // 🔍 Fetch orders from the database
-    const orders = await Order.find({ user_id: userId }).sort({ createdAt: -1 }); // Sort by latest orders
-
-    if (orders.length === 0) {
-      return res.status(404).json({ message: "No orders found for this user" });
-    }
-
-    return res.status(200).json(orders);
-  } catch (error) {
-    console.error("❌ Error fetching user orders:", error);
-    return res.status(500).json({ message: "Internal server error", error: error.message });
-  }
-});
-
-router.get("/api/orders/:orderId", async (req, res) => {
-  try {
-    const { orderId } = req.params;
-
-    const order = await Order.findOne({ order_id: orderId });
-
-    if (!order) {
-      return res.status(404).json({ message: "Order not found" });
-    }
-
-    res.status(200).json(order);
-  } catch (error) {
-    console.error("Error fetching order:", error);
-    res.status(500).json({ message: "Server error while fetching order" });
-  }
-});
-
-// fetch al users ordera
-
-router.get('/api/users/orders', async (req, res) => {
-  try {
-    // Optional: Add authentication/authorization middleware here to restrict to admins
-    const orders = await Order.find().sort({ createdAt: -1 }); // Sort by latest first
-
-    if (!orders || orders.length === 0) {
-      return res.status(404).json({ message: 'No orders found' });
-    }
-
-    res.status(200).json(orders);
-  } catch (error) {
-    console.error('Error fetching all orders:', error);
-    res.status(500).json({ message: 'Server error while fetching orders' });
-  }
-});
-
-import Query from "../models/query.js"; // Ensure this import is present
-
-// Submit a query
-router.post("/api/queries", async (req, res) => {
-  try {
-    const { userId, name, query, submittedAt } = req.body;
-
-    if (!userId || !name || !query) {
-      return res.status(400).json({ message: "User ID, name, and query are required" });
-    }
-
-    const newQuery = await Query.create({
-      userId,
-      name,  // Include name in the creation
-      query,
-      submittedAt,
-    });
-
-    res.status(201).json({ success: true, query: newQuery });
-  } catch (error) {
-    console.error("Error submitting query:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Get all queries (for admin)
-router.get("/api/queries", async (req, res) => {
-  try {
-    const queries = await Query.find()
-      .populate("userId", "name email") // Still populate user details for reference
-      .sort({ submittedAt: -1 });
-    res.json({ success: true, queries });
-  } catch (error) {
-    console.error("Error fetching queries:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// Respond to a query (for admin)
-router.put("/api/queries/:id/respond", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { response } = req.body;
-
-    if (!response) {
-      return res.status(400).json({ message: "Response is required" });
-    }
-
-    const query = await Query.findById(id);
-    if (!query) {
-      return res.status(404).json({ message: "Query not found" });
-    }
-
-    query.response = response;
-    query.status = "responded";
-    query.respondedAt = new Date();
-    await query.save();
-
-    res.json({ success: true, query });
-  } catch (error) {
-    console.error("Error responding to query:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// respond the query 
-
-router.get("/api/queries/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const query = await Query.findById(id);
-    if (!query) {
-      return res.status(404).json({ message: "Query not found" });
-    }
-
-    res.json({ success: true, query });
-  } catch (error) {
-    console.error("Error fetching query response:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-
-
-// make a dynamic layout route for home page for post also 
-import hometext from "../models/hometext.js";
-router.post("/api/home/data", async (req, res) => {
-  try {
-    const { title, subtitle } = req.body;
-    if (!title || !subtitle) {
-      return res.status(400).json({ message: "Title and subtitle are required" });
-    }
-    const newHometext = await hometext.create({
-      title,
-      subtitle,
-    });
-    res.status(201).json({ success: true, hometext: newHometext });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-});
-
-router.get("/api/home/data", async (req, res) => {
-  try {
-    // Fetch the most recent document, sorted by createdAt in descending order
-    const data = await hometext.find().sort({ createdAt: -1 }).limit(1);
-    if (!data || data.length === 0) {
-      return res.status(404).json({ success: false, message: "No hometext data found" });
-    }
-    res.status(200).json({ success: true, hometext: data[0] }); // Return the single newest document
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-// add a categories 
-
-router.post("/api/categories", async (req, res) => {
-  try {
-    const { name, image } = req.body;
-    if (!name || !image) {
-      return res.status(400).json({ message: "Name and image are required" });
-    }
-    const existingCategory = await Category.findOne({ name });
-    if (existingCategory) {
-      return res.status(400).json({ message: "Category already exists" });
-    }
-    const newCategory = await Category.create({ name, image });
-    res.status(201).json({ success: true, category: newCategory });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-router.get("/api/categories", async (req, res) => {
-  try {
-    const categories = await Category.find(); // Fetch all categories
-    // Optionally filter enabled categories: await Category.find({ enabled: true });
-    res.status(200).json({ success: true, categories });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Server error", error: err.message });
-  }
-});
-
-// for delete category
-router.patch('/api/categories/:id/enable', async (req, res) => {
-  try {
-    const category = await Category.findByIdAndUpdate(
-      req.params.id,
-      { enabled: true },
-      { new: true, runValidators: true }
-    );
-
-    if (!category) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Category not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Category enabled successfully',
-      category
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error enabling category',
-      error: error.message
-    });
-  }
-});
-
-// Disable a category
-router.patch('/api/categories/:id/disable', async (req, res) => {
-  try {
-    const category = await Category.findByIdAndUpdate(
-      req.params.id,
-      { enabled: false },
-      { new: true, runValidators: true }
-    );
-
-    if (!category) {
-      return res.status(404).json({ 
-        success: false,
-        message: 'Category not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Category disabled successfully',
-      category
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Error disabling category',
-      error: error.message
-    });
-  }
-});
-
-// POST /api/order/create-cod-order
-router.post("/api/order/create-cod-order", async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  try {
-    const { amount, user_id, products, shippingAddress } = req.body;
-
-    // Validate inputs
-    if (!amount || !user_id || !products?.length || !shippingAddress) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: "Missing required fields" });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(user_id)) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: "Invalid user ID" });
-    }
-
-    // Validate amount
-    const parsedAmount = Number(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: "Invalid amount" });
-    }
-
-    // Validate shipping address
-    const { name, email, street, city, pincode, phone } = shippingAddress;
-    if (!name || !email || !street || !city || !pincode || !phone) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({ success: false, message: "Incomplete shipping address" });
-    }
-
-    // Check product availability
-    for (const product of products) {
-      const video = await Video.findOne({
-        videoUrl: product.videoUrl,
-        category: product.category,
-        size: product.size,
-        price: product.price,
-      }).session(session);
-
-      if (!video || video.quantity < (product.quantity || 1)) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: `Product out of stock: ${product.category} ${product.size}`,
-          code: "INSUFFICIENT_STOCK",
+    // Validate form
+    if (!validateForm()) {
+      const firstErrorField = Object.keys(errors)[0];
+      if (firstErrorField) {
+        document.querySelector(`[name="${firstErrorField}"]`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
         });
       }
+      return;
     }
 
-    // Generate unique order_id
-    const orderId = `COD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create order
-    const order = new Order({
-      user_id: new mongoose.Types.ObjectId(user_id),
-      order_id: orderId,
-      amount: parsedAmount,
-      currency: "INR",
-      products: products.map((item) => ({
-        videoUrl: item.videoUrl,
-        price: item.price,
-        quantity: item.quantity || 1,
-        category: item.category,
-        size: item.size,
-      })),
-      shippingAddress: {
-        name,
-        email,
-        street,
-        city,
-        pincode,
-        phone,
-      },
-      status: "cod_pending",
-      paymentMethod: "cod",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    await order.save({ session });
-
-    // Update inventory
-    const bulkOps = products.map((product) => {
-      const quantity = Math.max(1, Number(product.quantity) || 1);
-      return {
-        updateOne: {
-          filter: {
-            videoUrl: product.videoUrl,
-            category: product.category,
-            size: product.size,
-            price: product.price,
-            quantity: { $gte: quantity },
-          },
-          update: {
-            $inc: { quantity: -quantity },
-            $set: { updatedAt: new Date() },
-          },
-        },
-      };
-    });
-
-    const bulkResult = await Video.bulkWrite(bulkOps, { session });
-
-    if (bulkResult.modifiedCount !== products.length) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(409).json({
-        success: false,
-        message: "Some items are out of stock",
-        code: "INSUFFICIENT_STOCK",
-      });
+    if (cartItems.length === 0) {
+      alert('Your cart is empty. Please add items to proceed.');
+      return;
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    setIsProcessingPayment(true);
+    setApiError(null);
 
-    res.status(201).json({
-      success: true,
-      order: {
-        id: order._id,
-        order_id: order.order_id,
-        amount: order.amount,
-        currency: order.currency,
-        status: order.status,
-        paymentMethod: order.paymentMethod,
-      },
-    });
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("COD order creation error:", error);
-    res.status(500).json({
-      success: false,
-      message: error.message || "Server error",
-      code: "SERVER_ERROR",
-    });
-  }
-});
+    try {
+      const backend = import.meta.env.VITE_BACKEND_URL;
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) throw new Error('Please login to continue');
+      if (!backend) throw new Error('Backend URL is not configured');
 
-export default router;
+      const totalAmount = calculateTotal();
+      if (isNaN(totalAmount) || totalAmount <= 0) throw new Error('Invalid order amount');
 
+      const transactionItems = [...cartItems];
 
+      if (formData.paymentMethod === 'Online Payment') {
+        if (!razorpayKey) throw new Error('Payment gateway key missing');
 
+        const razorpayLoaded = await loadRazorpay('https://checkout.razorpay.com/v1/checkout.js');
+        if (!razorpayLoaded) throw new Error('Failed to load payment gateway. Please try again.');
+
+        const { data } = await axios.post(
+          `${backend}/api/payment/create-order`,
+          {
+            amount: (totalAmount * 100).toString(), // Convert to paise
+            user_id: userId,
+            products: transactionItems.map((item) => ({
+              videoUrl: item.videoUrl,
+              price: item.price,
+              quantity: item.quantity || 1,
+              category: item.category,
+              size: item.size,
+            })),
+            shippingAddress: {
+              name: formData.name,
+              email: formData.email,
+              street: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+              phone: formData.phone,
+            },
+          },
+          { timeout: 10000 }
+        );
+
+        if (!data?.id) throw new Error('Invalid response from payment gateway');
+
+        // Lock scroll for payment modal
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
+
+        const options = {
+          key: razorpayKey,
+          amount: data.amount,
+          currency: data.currency || 'INR',
+          name: 'Wholesale Baba',
+          description: 'Product Purchase',
+          order_id: data.id,
+          handler: async (response) => {
+            try {
+              await axios.post(
+                `${backend}/api/payment/confirm`,
+                {
+                  order_id: data.id,
+                  payment_id: response.razorpay_payment_id,
+                  signature: response.razorpay_signature,
+                },
+                { timeout: 10000 }
+              );
+              clearPurchasedItemsFromCart(transactionItems);
+              restoreScroll();
+              navigate(`/order-confirmation/${data.id}`);
+            } catch (error) {
+              console.error('Confirmation failed:', error);
+              restoreScroll();
+              setApiError('Payment succeeded but confirmation failed. Please contact support with order ID: ' + data.id);
+            } finally {
+              setIsProcessingPayment(false);
+            }
+          },
+          prefill: {
+            name: formData.name,
+            email: formData.email,
+            contact: formData.phone,
+          },
+          theme: { color: '#2874f0' },
+          modal: {
+            ondismiss: () => {
+              restoreScroll();
+              setIsProcessingPayment(false);
+              setApiError('Payment was cancelled. You can try again.');
+            },
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', (response) => {
+          restoreScroll();
+          setIsProcessingPayment(false);
+          console.error('Payment failed:', response.error);
+          setApiError(`Payment failed: ${response.error.description}. Please try again.`);
+        });
+        rzp.open();
+      } else if (formData.paymentMethod === 'Cash on Delivery') {
+        const { data } = await axios.post(
+          `${backend}/api/order/create-cod-order`,
+          {
+            amount: (totalAmount * 100).toString(), // Convert to paise
+            user_id: userId,
+            products: transactionItems.map((item) => ({
+              videoUrl: item.videoUrl,
+              price: item.price,
+              quantity: item.quantity || 1,
+              category: item.category,
+              size: item.size,
+            })),
+            shippingAddress: {
+              name: formData.name,
+              email: formData.email,
+              street: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+              phone: formData.phone,
+            },
+          },
+          { 
+            timeout: 15000,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!data?.success || !data?.order?.order_id) {
+          throw new Error(data?.message || 'Failed to create COD order');
+        }
+
+        clearPurchasedItemsFromCart(transactionItems);
+        navigate(`/order-confirmation/${data.order.order_id}`);
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      restoreScroll();
+      setIsProcessingPayment(false);
+      
+      let errorMessage = 'Operation failed. Please try again.';
+      if (error.response) {
+        errorMessage = error.response.data?.message || errorMessage;
+        
+        if (error.response.data?.code === 'INSUFFICIENT_STOCK') {
+          errorMessage = 'Some items in your cart are out of stock. Please update your cart.';
+          // Refresh cart to reflect current stock
+          const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
+          setCartItems(currentCart);
+        }
+      } else if (error.request) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setApiError(errorMessage);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <Link to="/cart" className="flex items-center text-blue-600 hover:text-blue-800">
+              <ArrowLeft className="w-5 h-5 mr-2" />
+              <span className="text-sm font-medium">Back to Cart</span>
+            </Link>
+            <div className="flex items-center">
+              <ShieldCheck className="w-5 h-5 text-green-500 mr-2" />
+              <span className="text-sm text-gray-600">100% Secure Payment</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left Section - Delivery Details */}
+          <div className="lg:w-2/3">
+            <div className="bg-white shadow-sm rounded-lg p-6 mb-6">
+              <div className="flex items-center mb-6">
+                <div className="bg-blue-100 rounded-full p-2 mr-3">
+                  <Truck className="w-6 h-6 text-blue-600" />
+                </div>
+                <h2 className="text-xl font-semibold text-gray-800">Delivery Address</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your full name"
+                    required
+                  />
+                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your email"
+                    required
+                  />
+                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your full address"
+                    required
+                  />
+                  {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
+                  <input
+                    type="text"
+                    name="pincode"
+                    value={formData.pincode}
+                    onChange={handleChange}
+                    maxLength="6"
+                    className={`w-full p-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter 6-digit pincode"
+                    required
+                  />
+                  {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.city ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your city"
+                    required
+                  />
+                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.state ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your state"
+                    required
+                  />
+                  {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    maxLength="10"
+                    className={`w-full p-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter 10-digit phone number"
+                    required
+                  />
+                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                </div>
+              </div>
+
+              {/* Payment Method Selection */}
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <CreditCard className="w-5 h-5 text-blue-600 mr-2" />
+                  Payment Method
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="onlinePayment"
+                      name="paymentMethod"
+                      value="Online Payment"
+                      checked={formData.paymentMethod === 'Online Payment'}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label htmlFor="onlinePayment" className="ml-2 block text-sm font-medium text-gray-700">
+                      Online Payment (Credit/Debit Card, UPI, Net Banking)
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="cashOnDelivery"
+                      name="paymentMethod"
+                      value="Cash on Delivery"
+                      checked={formData.paymentMethod === 'Cash on Delivery'}
+                      onChange={handleChange}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <label htmlFor="cashOnDelivery" className="ml-2 block text-sm font-medium text-gray-700">
+                      Cash on Delivery (Pay when you receive)
+                    </label>
+                  </div>
+                </div>
+                {formData.paymentMethod === 'Cash on Delivery' && (
+                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                    <p className="text-sm text-yellow-700">
+                      Please have exact change ready. Our delivery executive will collect ₹{calculateTotal()} when your order is delivered.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Section - Order Summary */}
+          <div className="lg:w-1/3">
+            <div className="bg-white shadow-sm rounded-lg p-6 sticky top-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                <Package className="w-6 h-6 text-blue-600 mr-2" />
+                Order Summary
+              </h2>
+              
+              <div className="space-y-4 border-b pb-4">
+                <div className="flex justify-between text-gray-600">
+                  <span>Subtotal ({cartItems.length} items)</span>
+                  <span>₹{calculateSubtotal()}</span>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <span>Shipping Charges</span>
+                  <span>₹{calculateShippingCharges()}</span>
+                </div>
+              </div>
+              
+              <div className="flex justify-between text-lg font-semibold mt-4">
+                <span>Total Amount</span>
+                <span className="text-blue-600">₹{calculateTotal()}</span>
+              </div>
+              
+              {apiError && (
+                <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {apiError}
+                </div>
+              )}
+              
+              <div className="mt-6">
+                <button
+                  onClick={handlePayment}
+                  disabled={isProcessingPayment}
+                  className={`w-full py-3 ${
+                    isProcessingPayment 
+                      ? 'bg-yellow-500' 
+                      : formData.paymentMethod === 'Cash on Delivery' 
+                        ? 'bg-green-500 hover:bg-green-600' 
+                        : 'bg-yellow-400 hover:bg-yellow-500'
+                  } text-gray-800 font-semibold rounded-md transition-colors flex items-center justify-center shadow-md`}
+                >
+                  {isProcessingPayment ? (
+                    <>
+                      <svg
+                        className="animate-spin -ml-1 mr-2 h-5 w-5 text-gray-800"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      {formData.paymentMethod === 'Cash on Delivery' ? (
+                        <DollarSign className="w-5 h-5 mr-2" />
+                      ) : (
+                        <Lock className="w-5 h-5 mr-2" />
+                      )}
+                      {formData.paymentMethod === 'Cash on Delivery' ? 'Place COD Order' : 'Proceed to Payment'}
+                    </>
+                  )}
+                </button>
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Safe and Secure Payments. Easy returns. 100% Authentic products.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Checkout;
