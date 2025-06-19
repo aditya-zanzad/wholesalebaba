@@ -38,24 +38,34 @@ const Checkout = () => {
   const [apiError, setApiError] = useState(null);
   const navigate = useNavigate();
 
-  // Load cart items
+  // Load cart items and set up storage listener
   useEffect(() => {
     const loadCart = () => {
       const cart = JSON.parse(localStorage.getItem('cart')) || [];
       setCartItems(cart);
     };
+
     loadCart();
 
     const handleStorageChange = (e) => {
-      if (e.key === 'cart') loadCart();
+      if (e.key === 'cart') {
+        loadCart();
+      }
     };
+
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      restoreScroll();
+    };
   }, []);
 
   const restoreScroll = () => {
     document.body.style.overflow = 'auto';
     document.body.style.position = 'static';
+    document.body.style.height = 'auto';
+    document.body.style.width = 'auto';
   };
 
   // Calculate order totals
@@ -75,8 +85,14 @@ const Checkout = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-    if (errors[name]) setErrors({ ...errors, [name]: '' });
-    if (apiError) setApiError(null);
+    
+    if (errors[name]) {
+      setErrors({ ...errors, [name]: '' });
+    }
+    
+    if (apiError) {
+      setApiError(null);
+    }
   };
 
   // Form validation
@@ -124,50 +140,6 @@ const Checkout = () => {
     }
   };
 
-  // Handle COD order submission
-  const handleCreateCODOrder = async (transactionItems) => {
-    const backend = import.meta.env.VITE_BACKEND_URL;
-    const userId = localStorage.getItem('userId');
-    const totalAmount = calculateTotal();
-
-    const { data } = await axios.post(
-      `${backend}/api/order/create-cod-order`,
-      {
-        amount: (totalAmount * 100).toString(), // Convert to paise
-        user_id: userId,
-        products: transactionItems.map((item) => ({
-          videoUrl: item.videoUrl,
-          price: item.price,
-          quantity: item.quantity || 1,
-          category: item.category,
-          size: item.size,
-        })),
-        shippingAddress: {
-          name: formData.name,
-          email: formData.email,
-          street: formData.address,
-          city: formData.city,
-          state: formData.state,
-          pincode: formData.pincode,
-          phone: formData.phone,
-        },
-      },
-      { 
-        timeout: 15000,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-
-    if (!data?.success || !data?.order?.order_id) {
-      throw new Error(data?.message || 'Failed to create COD order');
-    }
-
-    clearPurchasedItemsFromCart(transactionItems);
-    navigate(`/order-confirmation/${data.order.order_id}`);
-  };
-
   // Handle payment submission
   const handlePayment = async () => {
     if (isProcessingPayment) return;
@@ -201,17 +173,19 @@ const Checkout = () => {
     setApiError(null);
 
     try {
+      const backend = import.meta.env.VITE_BACKEND_URL;
+      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
+      const userId = localStorage.getItem('userId');
+      
+      if (!userId) throw new Error('Please login to continue');
+      if (!backend) throw new Error('Backend URL is not configured');
+
+      const totalAmount = calculateTotal();
+      if (isNaN(totalAmount) || totalAmount <= 0) throw new Error('Invalid order amount');
+
       const transactionItems = [...cartItems];
 
-      if (formData.paymentMethod === 'Cash on Delivery') {
-        await handleCreateCODOrder(transactionItems);
-      } else {
-        // Online payment logic remains the same
-        const backend = import.meta.env.VITE_BACKEND_URL;
-        const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
-        const userId = localStorage.getItem('userId');
-        const totalAmount = calculateTotal();
-
+      if (formData.paymentMethod === 'Online Payment') {
         if (!razorpayKey) throw new Error('Payment gateway key missing');
 
         const razorpayLoaded = await loadRazorpay('https://checkout.razorpay.com/v1/checkout.js');
@@ -220,9 +194,15 @@ const Checkout = () => {
         const { data } = await axios.post(
           `${backend}/api/payment/create-order`,
           {
-            amount: (totalAmount * 100).toString(),
+            amount: (totalAmount * 100).toString(), // Convert to paise
             user_id: userId,
-            products: transactionItems,
+            products: transactionItems.map((item) => ({
+              videoUrl: item.videoUrl,
+              price: item.price,
+              quantity: item.quantity || 1,
+              category: item.category,
+              size: item.size,
+            })),
             shippingAddress: {
               name: formData.name,
               email: formData.email,
@@ -238,8 +218,11 @@ const Checkout = () => {
 
         if (!data?.id) throw new Error('Invalid response from payment gateway');
 
+        // Lock scroll for payment modal
         document.body.style.overflow = 'hidden';
         document.body.style.position = 'fixed';
+        document.body.style.width = '100%';
+        document.body.style.height = '100%';
 
         const options = {
           key: razorpayKey,
@@ -293,6 +276,43 @@ const Checkout = () => {
           setApiError(`Payment failed: ${response.error.description}. Please try again.`);
         });
         rzp.open();
+      } else if (formData.paymentMethod === 'Cash on Delivery') {
+        const { data } = await axios.post(
+          `${backend}/api/order/create-cod-order`,
+          {
+            amount: (totalAmount * 100).toString(), // Convert to paise
+            user_id: userId,
+            products: transactionItems.map((item) => ({
+              videoUrl: item.videoUrl,
+              price: item.price,
+              quantity: item.quantity || 1,
+              category: item.category,
+              size: item.size,
+            })),
+            shippingAddress: {
+              name: formData.name,
+              email: formData.email,
+              street: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+              phone: formData.phone,
+            },
+          },
+          { 
+            timeout: 15000,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+
+        if (!data?.success || !data?.order?.order_id) {
+          throw new Error(data?.message || 'Failed to create COD order');
+        }
+
+        clearPurchasedItemsFromCart(transactionItems);
+        navigate(`/order-confirmation/${data.order.order_id}`);
       }
     } catch (error) {
       console.error('Payment error:', error);
@@ -305,6 +325,7 @@ const Checkout = () => {
         
         if (error.response.data?.code === 'INSUFFICIENT_STOCK') {
           errorMessage = 'Some items in your cart are out of stock. Please update your cart.';
+          // Refresh cart to reflect current stock
           const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
           setCartItems(currentCart);
         }
@@ -321,6 +342,7 @@ const Checkout = () => {
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
           <div className="flex items-center justify-between">
             <Link to="/cart" className="flex items-center text-blue-600 hover:text-blue-800">
@@ -335,7 +357,7 @@ const Checkout = () => {
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Delivery Address Section */}
+          {/* Left Section - Delivery Details */}
           <div className="lg:w-2/3">
             <div className="bg-white shadow-sm rounded-lg p-6 mb-6">
               <div className="flex items-center mb-6">
@@ -346,25 +368,105 @@ const Checkout = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Form fields for address */}
-                {['name', 'email', 'address', 'pincode', 'city', 'state', 'phone'].map((field) => (
-                  <div key={field} className={field === 'address' ? 'md:col-span-2' : ''}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {field.charAt(0).toUpperCase() + field.slice(1).replace(/([A-Z])/g, ' $1')} *
-                    </label>
-                    <input
-                      type={field === 'email' ? 'email' : field === 'phone' || field === 'pincode' ? 'tel' : 'text'}
-                      name={field}
-                      value={formData[field]}
-                      onChange={handleChange}
-                      className={`w-full p-3 border ${errors[field] ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                      placeholder={`Enter your ${field}`}
-                      required
-                      maxLength={field === 'pincode' ? 6 : field === 'phone' ? 10 : undefined}
-                    />
-                    {errors[field] && <p className="text-red-500 text-xs mt-1">{errors[field]}</p>}
-                  </div>
-                ))}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your full name"
+                    required
+                  />
+                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your email"
+                    required
+                  />
+                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                </div>
+                
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your full address"
+                    required
+                  />
+                  {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
+                  <input
+                    type="text"
+                    name="pincode"
+                    value={formData.pincode}
+                    onChange={handleChange}
+                    maxLength="6"
+                    className={`w-full p-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter 6-digit pincode"
+                    required
+                  />
+                  {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.city ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your city"
+                    required
+                  />
+                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleChange}
+                    className={`w-full p-3 border ${errors.state ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter your state"
+                    required
+                  />
+                  {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state}</p>}
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    maxLength="10"
+                    className={`w-full p-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
+                    placeholder="Enter 10-digit phone number"
+                    required
+                  />
+                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
+                </div>
               </div>
 
               {/* Payment Method Selection */}
@@ -414,7 +516,7 @@ const Checkout = () => {
             </div>
           </div>
 
-          {/* Order Summary Section */}
+          {/* Right Section - Order Summary */}
           <div className="lg:w-1/3">
             <div className="bg-white shadow-sm rounded-lg p-6 sticky top-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
