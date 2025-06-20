@@ -8,7 +8,8 @@ import {
   ArrowLeft, 
   Package, 
   Lock, 
-  DollarSign 
+  DollarSign,
+  Wallet
 } from 'lucide-react';
 
 const loadRazorpay = (src) => {
@@ -80,6 +81,12 @@ const Checkout = () => {
 
   const calculateTotal = () => 
     (parseFloat(calculateSubtotal()) + calculateShippingCharges()).toFixed(2);
+
+  // Calculate partial payment amounts
+  const calculatePartialPayment = () => ({
+    upfront: (parseFloat(calculateTotal()) * 0.25).toFixed(2),
+    cod: (parseFloat(calculateTotal()) * 0.75).toFixed(2)
+  });
 
   // Handle form changes
   const handleChange = (e) => {
@@ -184,8 +191,15 @@ const Checkout = () => {
       if (isNaN(totalAmount) || totalAmount <= 0) throw new Error('Invalid order amount');
 
       const transactionItems = [...cartItems];
+      let paymentAmount = totalAmount;
+      let paymentType = 'full';
 
-      if (formData.paymentMethod === 'Online Payment') {
+      if (formData.paymentMethod === 'Partial Payment') {
+        paymentAmount = calculatePartialPayment().upfront;
+        paymentType = 'partial';
+      }
+
+      if (formData.paymentMethod === 'Online Payment' || formData.paymentMethod === 'Partial Payment') {
         if (!razorpayKey) throw new Error('Payment gateway key missing');
 
         const razorpayLoaded = await loadRazorpay('https://checkout.razorpay.com/v1/checkout.js');
@@ -194,7 +208,7 @@ const Checkout = () => {
         const { data } = await axios.post(
           `${backend}/api/payment/create-order`,
           {
-            amount: (totalAmount * 100).toString(), // Convert to paise
+            amount: (paymentAmount * 100).toString(), // Convert to paise
             user_id: userId,
             products: transactionItems.map((item) => ({
               videoUrl: item.videoUrl,
@@ -212,6 +226,8 @@ const Checkout = () => {
               pincode: formData.pincode,
               phone: formData.phone,
             },
+            payment_type: paymentType,
+            total_order_value: (totalAmount * 100).toString(),
           },
           { timeout: 10000 }
         );
@@ -493,18 +509,28 @@ const Checkout = () => {
                   <div className="flex items-center">
                     <input
                       type="radio"
-                      id="cashOnDelivery"
+                      id="partialPayment"
                       name="paymentMethod"
-                      value="Cash on Delivery"
-                      checked={formData.paymentMethod === 'Cash on Delivery'}
+                      value="Partial Payment"
+                      checked={formData.paymentMethod === 'Partial Payment'}
                       onChange={handleChange}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
                     />
-                    <label htmlFor="cashOnDelivery" className="ml-2 block text-sm font-medium text-gray-700">
-                      Cash on Delivery (Pay when you receive)
+                    <label htmlFor="partialPayment" className="ml-2 block text-sm font-medium text-gray-700">
+                       Cash on delivery (75%) + Partial Payment (25% UPI) 
                     </label>
                   </div>
+                 
                 </div>
+                
+                {formData.paymentMethod === 'Partial Payment' && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-700">
+                      Pay ₹{calculatePartialPayment().upfront} now via UPI and remaining ₹{calculatePartialPayment().cod} as cash on delivery.
+                    </p>
+                  </div>
+                )}
+                
                 {formData.paymentMethod === 'Cash on Delivery' && (
                   <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                     <p className="text-sm text-yellow-700">
@@ -540,6 +566,19 @@ const Checkout = () => {
                 <span className="text-blue-600">₹{calculateTotal()}</span>
               </div>
               
+              {formData.paymentMethod === 'Partial Payment' && (
+                <div className="mt-4 border-t pt-4">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>Advance Payment (25%)</span>
+                    <span>₹{calculatePartialPayment().upfront}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-600 mt-1">
+                    <span>COD Payment (75%)</span>
+                    <span>₹{calculatePartialPayment().cod}</span>
+                  </div>
+                </div>
+              )}
+              
               {apiError && (
                 <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
                   {apiError}
@@ -555,13 +594,15 @@ const Checkout = () => {
                       ? 'bg-yellow-500' 
                       : formData.paymentMethod === 'Cash on Delivery' 
                         ? 'bg-green-500 hover:bg-green-600' 
-                        : 'bg-yellow-400 hover:bg-yellow-500'
-                  } text-gray-800 font-semibold rounded-md transition-colors flex items-center justify-center shadow-md`}
+                        : formData.paymentMethod === 'Partial Payment'
+                          ? 'bg-purple-500 hover:bg-purple-600'
+                          : 'bg-yellow-400 hover:bg-yellow-500'
+                  } text-white font-semibold rounded-md transition-colors flex items-center justify-center shadow-md`}
                 >
                   {isProcessingPayment ? (
                     <>
                       <svg
-                        className="animate-spin -ml-1 mr-2 h-5 w-5 text-gray-800"
+                        className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
@@ -579,10 +620,16 @@ const Checkout = () => {
                     <>
                       {formData.paymentMethod === 'Cash on Delivery' ? (
                         <DollarSign className="w-5 h-5 mr-2" />
+                      ) : formData.paymentMethod === 'Partial Payment' ? (
+                        <Wallet className="w-5 h-5 mr-2" />
                       ) : (
                         <Lock className="w-5 h-5 mr-2" />
                       )}
-                      {formData.paymentMethod === 'Cash on Delivery' ? 'Place COD Order' : 'Proceed to Payment'}
+                      {formData.paymentMethod === 'Cash on Delivery' 
+                        ? 'Place COD Order' 
+                        : formData.paymentMethod === 'Partial Payment'
+                          ? 'Pay 25% Now'
+                          : 'Proceed to Payment'}
                     </>
                   )}
                 </button>
