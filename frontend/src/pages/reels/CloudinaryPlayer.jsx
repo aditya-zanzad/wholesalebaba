@@ -76,7 +76,7 @@ const CloudinaryPlayer = () => {
   useEffect(() => {
     setAnimatedDiscount(0);
     let start = 0;
-    const targetDiscount = 60; // Fixed discount percentage
+    const targetDiscount = 60;
 
     const interval = setInterval(() => {
       if (start < targetDiscount) {
@@ -109,50 +109,59 @@ const CloudinaryPlayer = () => {
       return;
     }
 
-    const availableQuantity = currentVideo.quantity;
-    const selectedVideo = {
-      id: currentVideo.id,
-      videoUrl: currentVideo.videoUrl,
-      category: selectedCategory,
-      size: selectedSize,
-      price: currentVideo.price,
-      quantity: Math.min(selectedQuantity, availableQuantity),
-      productId: currentVideo.id // Using the unique MongoDB _id
-    };
-
     const existingCart = JSON.parse(localStorage.getItem("cart")) || [];
     
-    // Check if this exact product is already in cart (using videoUrl as unique identifier)
+    // Check if this exact product is already in cart
     const existingItemIndex = existingCart.findIndex(
-      (item) => item.videoUrl === selectedVideo.videoUrl
+      (item) => item.id === currentVideo.id && item.size === selectedSize
     );
 
+    const availableQuantity = currentVideo.quantity;
+    const quantityToAdd = Math.min(selectedQuantity, availableQuantity);
+
     if (existingItemIndex !== -1) {
-      // Calculate new quantity without exceeding available stock
-      const newQuantity = Math.min(
-        existingCart[existingItemIndex].quantity + selectedQuantity,
-        availableQuantity
-      );
+      // Calculate new total quantity
+      const newTotalQuantity = existingCart[existingItemIndex].quantity + quantityToAdd;
       
-      if (newQuantity <= existingCart[existingItemIndex].quantity) {
-        alert("Cannot add more than available stock");
+      if (newTotalQuantity > availableQuantity) {
+        alert(`You can only add ${availableQuantity - existingCart[existingItemIndex].quantity} more of this item`);
         return;
       }
       
-      existingCart[existingItemIndex].quantity = newQuantity;
+      existingCart[existingItemIndex].quantity = newTotalQuantity;
     } else {
       // Add new item to cart
-      existingCart.push(selectedVideo);
+      existingCart.push({
+        id: currentVideo.id,
+        videoUrl: currentVideo.videoUrl,
+        category: selectedCategory,
+        size: selectedSize,
+        price: currentVideo.price,
+        quantity: quantityToAdd,
+        productId: currentVideo.id
+      });
     }
 
     localStorage.setItem("cart", JSON.stringify(existingCart));
     setCartCount(existingCart.length);
-    setSelectedQuantity(1);
     
     // Trigger cart update event for other components
     window.dispatchEvent(new Event('storage'));
     
     alert("Added to cart 🛒");
+  };
+
+  const handleQuantityChange = (change) => {
+    const currentVideo = videoData[currentIndex];
+    if (!currentVideo) return;
+
+    const newQuantity = selectedQuantity + change;
+    if (newQuantity < 1) return;
+    if (newQuantity > currentVideo.quantity) {
+      alert(`Only ${currentVideo.quantity} available`);
+      return;
+    }
+    setSelectedQuantity(newQuantity);
   };
 
   return (
@@ -177,7 +186,7 @@ const CloudinaryPlayer = () => {
           <div className="absolute top-3 left-3 bg-black bg-opacity-60 text-white px-4 py-2 rounded-md">
             {videoData[currentIndex]?.price !== undefined && (() => {
               const discountedPrice = videoData[currentIndex].price;
-              const discountPercentage = 60; // Fixed discount percentage
+              const discountPercentage = 60;
               const originalPrice = (discountedPrice / (1 - discountPercentage / 100)).toFixed(2);
               const isOutOfStock = videoData[currentIndex].quantity === 0;
 
@@ -238,21 +247,19 @@ const CloudinaryPlayer = () => {
 
             <div className="flex items-center gap-4">
               {videoData[currentIndex]?.quantity > 0 && (
-                <div className="flex items-center gap-2 bg-black bg-opacity-60 text-white px-3 py-1 rounded">
+                <div className="flex items-center gap-2 bg-black bg-opacity-60 text-white px-3 py-1 rounded font-bold text-2xl">
                   <button
-                    onClick={() => setSelectedQuantity(prev => Math.max(1, prev - 1))}
+                    onClick={() => handleQuantityChange(-1)}
                     disabled={selectedQuantity === 1}
-                    className={`px-2 ${selectedQuantity === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-4 ${selectedQuantity === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     -
                   </button>
                   <span className="min-w-[20px] text-center">{selectedQuantity}</span>
                   <button
-                    onClick={() => setSelectedQuantity(prev => 
-                      Math.min(videoData[currentIndex].quantity, prev + 1)
-                    )}
+                    onClick={() => handleQuantityChange(1)}
                     disabled={selectedQuantity >= videoData[currentIndex].quantity}
-                    className={`px-2 ${selectedQuantity >= videoData[currentIndex].quantity ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`px-4 ${selectedQuantity >= videoData[currentIndex].quantity ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     +
                   </button>
