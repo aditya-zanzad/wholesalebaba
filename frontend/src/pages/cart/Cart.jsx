@@ -255,10 +255,7 @@ const Cart = () => {
                     <span>Subtotal ({totalQuantity} items)</span>
                     <span>₹{subtotal}</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Shipping</span>
-                    <span>{shipping === 0 ? "FREE" : `₹${shipping.toFixed(2)}`}</span>
-                  </div>
+                 
                 </div>
                 <div className="flex justify-between text-lg font-semibold mt-4">
                   <span>Total</span>
