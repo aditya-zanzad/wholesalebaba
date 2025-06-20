@@ -1,648 +1,295 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Link, useNavigate } from 'react-router-dom';
-import { 
-  CreditCard, 
-  Truck, 
-  ShieldCheck, 
-  ArrowLeft, 
-  Package, 
-  Lock, 
-  DollarSign,
-  Wallet
-} from 'lucide-react';
+import React, { useEffect, useState, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
+import "./file.css";
 
-const loadRazorpay = (src) => {
-  return new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
+const CloudinaryPlayer = () => {
+  const [videoData, setVideoData] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [cartCount, setCartCount] = useState(0);
+  const [animatedDiscount, setAnimatedDiscount] = useState(0);
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const videoRefs = useRef([]);
+  const location = useLocation();
 
-const Checkout = () => {
-  const [cartItems, setCartItems] = useState([]);
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    address: '',
-    pincode: '',
-    city: '',
-    state: '',
-    phone: '',
-    paymentMethod: 'Online Payment',
-  });
-  const [errors, setErrors] = useState({});
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [apiError, setApiError] = useState(null);
-  const navigate = useNavigate();
+  const queryParams = new URLSearchParams(location.search);
+  const selectedCategory = (queryParams.get("category") || "SHIRTS").toUpperCase();
+  const selectedSize = (queryParams.get("size") || "M").toUpperCase();
 
-  // Load cart items and set up storage listener
   useEffect(() => {
-    const loadCart = () => {
-      const cart = JSON.parse(localStorage.getItem('cart')) || [];
-      setCartItems(cart);
-    };
+    const fetchVideosAndPrices = async () => {
+      try {
+        const backend = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+        const response = await fetch(
+          `${backend}/api/videos/data/${selectedCategory}/${selectedSize}`
+        );
 
-    loadCart();
+        if (!response.ok)
+          throw new Error(`HTTP error! Status: ${response.status}`);
 
-    const handleStorageChange = (e) => {
-      if (e.key === 'cart') {
-        loadCart();
+        const data = await response.json();
+        setVideoData(data.videoData);
+      } catch (error) {
+        console.error("Error fetching videos and prices:", error);
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    fetchVideosAndPrices();
+  }, [selectedCategory, selectedSize]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          if (entry.isIntersecting) {
+            video.play().catch((err) => console.error("Autoplay failed:", err));
+            video.muted = false;
+          } else {
+            video.pause();
+            video.muted = true;
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    videoRefs.current.forEach((video) => {
+      if (video) observer.observe(video);
+    });
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      restoreScroll();
+      videoRefs.current.forEach((video) => {
+        if (video) observer.unobserve(video);
+      });
     };
+  }, [videoData]);
+
+  useEffect(() => {
+    const existingCart = JSON.parse(localStorage.getItem("cart")) || [];
+    setCartCount(existingCart.length);
   }, []);
 
-  const restoreScroll = () => {
-    document.body.style.overflow = 'auto';
-    document.body.style.position = 'static';
-    document.body.style.height = 'auto';
-    document.body.style.width = 'auto';
+  useEffect(() => {
+    setSelectedQuantity(1);
+  }, [currentIndex]);
+
+  useEffect(() => {
+    setAnimatedDiscount(0);
+    let start = 0;
+    const targetDiscount = 60;
+
+    const interval = setInterval(() => {
+      if (start < targetDiscount) {
+        start++;
+        setAnimatedDiscount(start);
+      } else {
+        clearInterval(interval);
+      }
+    }, 40);
+
+    return () => clearInterval(interval);
+  }, [currentIndex]);
+
+  const handleNextReel = () => {
+    if (videoData.length === 0) {
+      alert(
+        `No videos available for ${selectedCategory} - Size ${selectedSize}`
+      );
+      return;
+    }
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % videoData.length);
   };
 
-  // Calculate order totals
-  const calculateSubtotal = () => 
-    parseFloat(cartItems.reduce((total, item) => 
-      total + (item.price || 0) * (item.quantity || 1), 0)).toFixed(2);
-
-  const calculateShippingCharges = () => {
-    const orderValue = parseFloat(calculateSubtotal());
-    return orderValue < 2000 ? 140 : 140 + Math.floor((orderValue - 2000) / 500) * 30;
-  };
-
-  const calculateTotal = () => 
-    (parseFloat(calculateSubtotal()) + calculateShippingCharges()).toFixed(2);
-
-  // Calculate partial payment amounts
-  const calculatePartialPayment = () => ({
-    upfront: (parseFloat(calculateTotal()) * 0.25).toFixed(2),
-    cod: (parseFloat(calculateTotal()) * 0.75).toFixed(2)
-  });
-
-  // Handle form changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+  const handleAddToCart = () => {
+    if (videoData.length === 0 || currentIndex >= videoData.length) return;
     
-    if (errors[name]) {
-      setErrors({ ...errors, [name]: '' });
+    const currentVideo = videoData[currentIndex];
+    if (currentVideo.quantity <= 0) {
+      alert("This item is out of stock");
+      return;
     }
+
+    const existingCart = JSON.parse(localStorage.getItem("cart")) || [];
     
-    if (apiError) {
-      setApiError(null);
+    // Check if this exact product is already in cart
+    const existingItemIndex = existingCart.findIndex(
+      (item) => item.id === currentVideo.id && item.size === selectedSize
+    );
+
+    const availableQuantity = currentVideo.quantity;
+    const quantityToAdd = Math.min(selectedQuantity, availableQuantity);
+
+    if (existingItemIndex !== -1) {
+      // Calculate new total quantity
+      const newTotalQuantity = existingCart[existingItemIndex].quantity + quantityToAdd;
+      
+      if (newTotalQuantity > availableQuantity) {
+        alert(`You can only add ${availableQuantity - existingCart[existingItemIndex].quantity} more of this item`);
+        return;
+      }
+      
+      existingCart[existingItemIndex].quantity = newTotalQuantity;
+    } else {
+      // Add new item to cart
+      existingCart.push({
+        id: currentVideo.id,
+        videoUrl: currentVideo.videoUrl,
+        category: selectedCategory,
+        size: selectedSize,
+        price: currentVideo.price,
+        quantity: quantityToAdd,
+        productId: currentVideo.id
+      });
     }
+
+    localStorage.setItem("cart", JSON.stringify(existingCart));
+    setCartCount(existingCart.length);
+    
+    // Trigger cart update event for other components
+    window.dispatchEvent(new Event('storage'));
+    
+    alert("Added to cart 🛒");
   };
 
-  // Form validation
-  const validateForm = () => {
-    const newErrors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const handleQuantityChange = (change) => {
+    const currentVideo = videoData[currentIndex];
+    if (!currentVideo) return;
 
-    if (!formData.name.trim()) newErrors.name = 'Full Name is required';
-    else if (formData.name.trim().length < 3) newErrors.name = 'Name must be at least 3 characters';
-
-    if (!formData.email.trim()) newErrors.email = 'Email is required';
-    else if (!emailRegex.test(formData.email)) newErrors.email = 'Please enter a valid email';
-
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    else if (formData.address.trim().length < 10) newErrors.address = 'Address must be at least 10 characters';
-
-    if (!formData.pincode) newErrors.pincode = 'Pincode is required';
-    else if (!/^\d{6}$/.test(formData.pincode)) newErrors.pincode = 'Pincode must be 6 digits';
-
-    if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.state.trim()) newErrors.state = 'State is required';
-
-    if (!formData.phone) newErrors.phone = 'Phone number is required';
-    else if (!/^\d{10}$/.test(formData.phone)) newErrors.phone = 'Phone must be 10 digits';
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Clear purchased items from cart
-  const clearPurchasedItemsFromCart = (purchasedItems) => {
-    try {
-      const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
-      const purchasedItemUrls = new Set(purchasedItems.map((item) => item.videoUrl));
-      const updatedCart = currentCart.filter((item) => !purchasedItemUrls.has(item.videoUrl));
-      
-      localStorage.setItem('cart', JSON.stringify(updatedCart));
-      setCartItems(updatedCart);
-      window.dispatchEvent(new Event('cart-updated'));
-      
-      return updatedCart;
-    } catch (error) {
-      console.error('Error clearing cart:', error);
-      return null;
-    }
-  };
-
-  // Handle payment submission
-  const handlePayment = async () => {
-    if (isProcessingPayment) return;
-
-    // Validate cart hasn't changed
-    const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
-    if (currentCart.length !== cartItems.length) {
-      setApiError('Your cart has changed. Please review your items before payment.');
-      setCartItems(currentCart);
+    const newQuantity = selectedQuantity + change;
+    if (newQuantity < 1) return;
+    if (newQuantity > currentVideo.quantity) {
+      alert(`Only ${currentVideo.quantity} available`);
       return;
     }
-
-    // Validate form
-    if (!validateForm()) {
-      const firstErrorField = Object.keys(errors)[0];
-      if (firstErrorField) {
-        document.querySelector(`[name="${firstErrorField}"]`)?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'center',
-        });
-      }
-      return;
-    }
-
-    if (cartItems.length === 0) {
-      alert('Your cart is empty. Please add items to proceed.');
-      return;
-    }
-
-    setIsProcessingPayment(true);
-    setApiError(null);
-
-    try {
-      const backend = import.meta.env.VITE_BACKEND_URL;
-      const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY;
-      const userId = localStorage.getItem('userId');
-      
-      if (!userId) throw new Error('Please login to continue');
-      if (!backend) throw new Error('Backend URL is not configured');
-
-      const totalAmount = calculateTotal();
-      if (isNaN(totalAmount) || totalAmount <= 0) throw new Error('Invalid order amount');
-
-      const transactionItems = [...cartItems];
-      let paymentAmount = totalAmount;
-      let paymentType = 'full';
-
-      if (formData.paymentMethod === 'Partial Payment') {
-        paymentAmount = calculatePartialPayment().upfront;
-        paymentType = 'partial';
-      }
-
-      if (formData.paymentMethod === 'Online Payment' || formData.paymentMethod === 'Partial Payment') {
-        if (!razorpayKey) throw new Error('Payment gateway key missing');
-
-        const razorpayLoaded = await loadRazorpay('https://checkout.razorpay.com/v1/checkout.js');
-        if (!razorpayLoaded) throw new Error('Failed to load payment gateway. Please try again.');
-
-        const { data } = await axios.post(
-          `${backend}/api/payment/create-order`,
-          {
-            amount: (paymentAmount * 100).toString(), // Convert to paise
-            user_id: userId,
-            products: transactionItems.map((item) => ({
-              videoUrl: item.videoUrl,
-              price: item.price,
-              quantity: item.quantity || 1,
-              category: item.category,
-              size: item.size,
-            })),
-            shippingAddress: {
-              name: formData.name,
-              email: formData.email,
-              street: formData.address,
-              city: formData.city,
-              state: formData.state,
-              pincode: formData.pincode,
-              phone: formData.phone,
-            },
-            payment_type: paymentType,
-            total_order_value: (totalAmount * 100).toString(),
-          },
-          { timeout: 10000 }
-        );
-
-        if (!data?.id) throw new Error('Invalid response from payment gateway');
-
-        // Lock scroll for payment modal
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
-        document.body.style.height = '100%';
-
-        const options = {
-          key: razorpayKey,
-          amount: data.amount,
-          currency: data.currency || 'INR',
-          name: 'Wholesale Baba',
-          description: 'Product Purchase',
-          order_id: data.id,
-          handler: async (response) => {
-            try {
-              await axios.post(
-                `${backend}/api/payment/confirm`,
-                {
-                  order_id: data.id,
-                  payment_id: response.razorpay_payment_id,
-                  signature: response.razorpay_signature,
-                },
-                { timeout: 10000 }
-              );
-              clearPurchasedItemsFromCart(transactionItems);
-              restoreScroll();
-              navigate(`/order-confirmation/${data.id}`);
-            } catch (error) {
-              console.error('Confirmation failed:', error);
-              restoreScroll();
-              setApiError('Payment succeeded but confirmation failed. Please contact support with order ID: ' + data.id);
-            } finally {
-              setIsProcessingPayment(false);
-            }
-          },
-          prefill: {
-            name: formData.name,
-            email: formData.email,
-            contact: formData.phone,
-          },
-          theme: { color: '#2874f0' },
-          modal: {
-            ondismiss: () => {
-              restoreScroll();
-              setIsProcessingPayment(false);
-              setApiError('Payment was cancelled. You can try again.');
-            },
-          },
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.on('payment.failed', (response) => {
-          restoreScroll();
-          setIsProcessingPayment(false);
-          console.error('Payment failed:', response.error);
-          setApiError(`Payment failed: ${response.error.description}. Please try again.`);
-        });
-        rzp.open();
-      } else if (formData.paymentMethod === 'Cash on Delivery') {
-        const { data } = await axios.post(
-          `${backend}/api/order/create-cod-order`,
-          {
-            amount: (totalAmount * 100).toString(), // Convert to paise
-            user_id: userId,
-            products: transactionItems.map((item) => ({
-              videoUrl: item.videoUrl,
-              price: item.price,
-              quantity: item.quantity || 1,
-              category: item.category,
-              size: item.size,
-            })),
-            shippingAddress: {
-              name: formData.name,
-              email: formData.email,
-              street: formData.address,
-              city: formData.city,
-              state: formData.state,
-              pincode: formData.pincode,
-              phone: formData.phone,
-            },
-          },
-          { 
-            timeout: 15000,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        if (!data?.success || !data?.order?.order_id) {
-          throw new Error(data?.message || 'Failed to create COD order');
-        }
-
-        clearPurchasedItemsFromCart(transactionItems);
-        navigate(`/order-confirmation/${data.order.order_id}`);
-      }
-    } catch (error) {
-      console.error('Payment error:', error);
-      restoreScroll();
-      setIsProcessingPayment(false);
-      
-      let errorMessage = 'Operation failed. Please try again.';
-      if (error.response) {
-        errorMessage = error.response.data?.message || errorMessage;
-        
-        if (error.response.data?.code === 'INSUFFICIENT_STOCK') {
-          errorMessage = 'Some items in your cart are out of stock. Please update your cart.';
-          // Refresh cart to reflect current stock
-          const currentCart = JSON.parse(localStorage.getItem('cart')) || [];
-          setCartItems(currentCart);
-        }
-      } else if (error.request) {
-        errorMessage = 'Network error. Please check your connection.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setApiError(errorMessage);
-    }
+    setSelectedQuantity(newQuantity);
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white shadow-sm rounded-lg p-4 mb-6">
-          <div className="flex items-center justify-between">
-            <Link to="/cart" className="flex items-center text-blue-600 hover:text-blue-800">
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              <span className="text-sm font-medium">Back to Cart</span>
-            </Link>
-            <div className="flex items-center">
-              <ShieldCheck className="w-5 h-5 text-green-500 mr-2" />
-              <span className="text-sm text-gray-600">100% Secure Payment</span>
+    <div className="reel-container flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6">
+      {videoData.length > 0 && currentIndex < videoData.length ? (
+        <div className="video-wrapper relative">
+          <video
+            key={videoData[currentIndex].videoUrl}
+            ref={(el) => {
+              if (el) videoRefs.current[currentIndex] = el;
+            }}
+            controls
+            loop
+            playsInline
+            autoPlay
+            className="reel-video rounded-lg shadow-md w-full max-w-md"
+          >
+            <source src={videoData[currentIndex].videoUrl} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+
+          <div className="absolute top-3 left-3 bg-black bg-opacity-60 text-white px-4 py-2 rounded-md">
+            {videoData[currentIndex]?.price !== undefined && (() => {
+              const discountedPrice = videoData[currentIndex].price;
+              const discountPercentage = 60;
+              const originalPrice = (discountedPrice / (1 - discountPercentage / 100)).toFixed(2);
+              const isOutOfStock = videoData[currentIndex].quantity === 0;
+
+              return (
+                <>
+                  <p className="text-md font-semibold flex items-center justify-between">
+                    <span>
+                      {selectedCategory} | Size: {selectedSize} |
+                      <span className="text-gray-400 line-through ml-2">
+                        Price: ₹{originalPrice}
+                      </span> | 
+                    </span>
+                    <Link to='/cart'>
+                      <button className="ml-2 px-3 py-2 text-sm font-bold text-white bg-blue-500 rounded-sm shadow-lg hover:bg-blue-600 hover:shadow-xl transition-all transform hover:scale-110 flex items-center gap-2 relative">
+                        Cart
+                        {cartCount > 0 && (
+                          <span className="absolute -top-2 -right-2 bg-red-600 text-white text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full">
+                            {cartCount}
+                          </span>
+                        )}
+                      </button>
+                    </Link>
+                  </p>
+
+                  <p className="text-lg font-bold text-yellow-600">
+                    Wholesale Price: ₹{discountedPrice} (
+                    <span className="text-white text-sm">
+                      {animatedDiscount}% OFF
+                    </span>)
+                  </p>
+                  <p className={`text-sm ${isOutOfStock ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                    {isOutOfStock ? "Out of Stock" : `Available: ${videoData[currentIndex].quantity} | Selected: ${selectedQuantity}`}
+                  </p>
+                </>
+              );
+            })()}
+          </div>
+
+          <div className="absolute bottom-3 left-0 right-0 flex justify-between items-center w-full px-4">
+            <button
+              className="text-3xl text-gray-700 hover:text-gray-900 transition-transform transform hover:scale-125"
+              onClick={() =>
+                setCurrentIndex(
+                  (prevIndex) =>
+                    (prevIndex - 1 + videoData.length) % videoData.length
+                )
+              }
+            >
+              ⏮️
+            </button>
+
+            <button
+              className="text-3xl text-blue-600 hover:text-indigo-800 transition-transform transform hover:scale-125"
+              onClick={handleNextReel}
+            >
+              ⏭️
+            </button>
+
+            <div className="flex items-center gap-4">
+              {videoData[currentIndex]?.quantity > 0 && (
+                <div className="flex items-center gap-2 bg-black bg-opacity-60 text-white px-3 py-1 rounded font-bold text-2xl">
+                  <button
+                    onClick={() => handleQuantityChange(-1)}
+                    disabled={selectedQuantity === 1}
+                    className={`px-4 ${selectedQuantity === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    -
+                  </button>
+                  <span className="min-w-[20px] text-center">{selectedQuantity}</span>
+                  <button
+                    onClick={() => handleQuantityChange(1)}
+                    disabled={selectedQuantity >= videoData[currentIndex].quantity}
+                    className={`px-4 ${selectedQuantity >= videoData[currentIndex].quantity ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    +
+                  </button>
+                </div>
+              )}
+
+              <button
+                className={`px-3 py-1.5 text-sm font-bold text-white rounded-full shadow-lg transition-all transform hover:scale-110 flex items-center gap-2 ${
+                  videoData[currentIndex].quantity === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-500 hover:bg-yellow-600 hover:shadow-xl'
+                }`}
+                onClick={handleAddToCart}
+                disabled={videoData[currentIndex].quantity === 0}
+              >
+                Add to Cart{" "}
+                <span className="text-xl bg-black rounded-full p-2">🛒</span>
+              </button>
             </div>
           </div>
         </div>
-
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left Section - Delivery Details */}
-          <div className="lg:w-2/3">
-            <div className="bg-white shadow-sm rounded-lg p-6 mb-6">
-              <div className="flex items-center mb-6">
-                <div className="bg-blue-100 rounded-full p-2 mr-3">
-                  <Truck className="w-6 h-6 text-blue-600" />
-                </div>
-                <h2 className="text-xl font-semibold text-gray-800">Delivery Address</h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className={`w-full p-3 border ${errors.name ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter your full name"
-                    required
-                  />
-                  {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className={`w-full p-3 border ${errors.email ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter your email"
-                    required
-                  />
-                  {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
-                </div>
-                
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    className={`w-full p-3 border ${errors.address ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter your full address"
-                    required
-                  />
-                  {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
-                  <input
-                    type="text"
-                    name="pincode"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    maxLength="6"
-                    className={`w-full p-3 border ${errors.pincode ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter 6-digit pincode"
-                    required
-                  />
-                  {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    className={`w-full p-3 border ${errors.city ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter your city"
-                    required
-                  />
-                  {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-                  <input
-                    type="text"
-                    name="state"
-                    value={formData.state}
-                    onChange={handleChange}
-                    className={`w-full p-3 border ${errors.state ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter your state"
-                    required
-                  />
-                  {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state}</p>}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    maxLength="10"
-                    className={`w-full p-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all`}
-                    placeholder="Enter 10-digit phone number"
-                    required
-                  />
-                  {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
-                </div>
-              </div>
-
-              {/* Payment Method Selection */}
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <CreditCard className="w-5 h-5 text-blue-600 mr-2" />
-                  Payment Method
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="onlinePayment"
-                      name="paymentMethod"
-                      value="Online Payment"
-                      checked={formData.paymentMethod === 'Online Payment'}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <label htmlFor="onlinePayment" className="ml-2 block text-sm font-medium text-gray-700">
-                      Online Payment (Credit/Debit Card, UPI, Net Banking)
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="partialPayment"
-                      name="paymentMethod"
-                      value="Partial Payment"
-                      checked={formData.paymentMethod === 'Partial Payment'}
-                      onChange={handleChange}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <label htmlFor="partialPayment" className="ml-2 block text-sm font-medium text-gray-700">
-                       Cash on delivery (75%) + Partial Payment (25% UPI) 
-                    </label>
-                  </div>
-                 
-                </div>
-                
-                {formData.paymentMethod === 'Partial Payment' && (
-                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-blue-700">
-                      Pay ₹{calculatePartialPayment().upfront} now via UPI and remaining ₹{calculatePartialPayment().cod} as cash on delivery.
-                    </p>
-                  </div>
-                )}
-                
-                {formData.paymentMethod === 'Cash on Delivery' && (
-                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <p className="text-sm text-yellow-700">
-                      Please have exact change ready. Our delivery executive will collect ₹{calculateTotal()} when your order is delivered.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Right Section - Order Summary */}
-          <div className="lg:w-1/3">
-            <div className="bg-white shadow-sm rounded-lg p-6 sticky top-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                <Package className="w-6 h-6 text-blue-600 mr-2" />
-                Order Summary
-              </h2>
-              
-              <div className="space-y-4 border-b pb-4">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal ({cartItems.length} items)</span>
-                  <span>₹{calculateSubtotal()}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping Charges</span>
-                  <span>₹{calculateShippingCharges()}</span>
-                </div>
-              </div>
-              
-              <div className="flex justify-between text-lg font-semibold mt-4">
-                <span>Total Amount</span>
-                <span className="text-blue-600">₹{calculateTotal()}</span>
-              </div>
-              
-              {formData.paymentMethod === 'Partial Payment' && (
-                <div className="mt-4 border-t pt-4">
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Advance Payment (25%)</span>
-                    <span>₹{calculatePartialPayment().upfront}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600 mt-1">
-                    <span>COD Payment (75%)</span>
-                    <span>₹{calculatePartialPayment().cod}</span>
-                  </div>
-                </div>
-              )}
-              
-              {apiError && (
-                <div className="mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-                  {apiError}
-                </div>
-              )}
-              
-              <div className="mt-6">
-                <button
-                  onClick={handlePayment}
-                  disabled={isProcessingPayment}
-                  className={`w-full py-3 ${
-                    isProcessingPayment 
-                      ? 'bg-yellow-500' 
-                      : formData.paymentMethod === 'Cash on Delivery' 
-                        ? 'bg-green-500 hover:bg-green-600' 
-                        : formData.paymentMethod === 'Partial Payment'
-                          ? 'bg-purple-500 hover:bg-purple-600'
-                          : 'bg-yellow-400 hover:bg-yellow-500'
-                  } text-white font-semibold rounded-md transition-colors flex items-center justify-center shadow-md`}
-                >
-                  {isProcessingPayment ? (
-                    <>
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      {formData.paymentMethod === 'Cash on Delivery' ? (
-                        <DollarSign className="w-5 h-5 mr-2" />
-                      ) : formData.paymentMethod === 'Partial Payment' ? (
-                        <Wallet className="w-5 h-5 mr-2" />
-                      ) : (
-                        <Lock className="w-5 h-5 mr-2" />
-                      )}
-                      {formData.paymentMethod === 'Cash on Delivery' 
-                        ? 'Place COD Order' 
-                        : formData.paymentMethod === 'Partial Payment'
-                          ? 'Pay 25% Now'
-                          : 'Proceed to Payment'}
-                    </>
-                  )}
-                </button>
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  Safe and Secure Payments. Easy returns. 100% Authentic products.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      ) : (
+        <p className="text-gray-700">
+          {videoData.length === 0 
+            ? `No videos available for ${selectedCategory} - Size ${selectedSize}.`
+            : "Loading videos..."}
+        </p>
+      )}
     </div>
   );
 };
 
-export default Checkout;
+export default CloudinaryPlayer;
