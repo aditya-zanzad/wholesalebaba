@@ -20,14 +20,21 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
-    city: { // Added city field
+    city: {
       type: String,
       required: true,
       trim: true,
     },
+    mobile: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [/^[0-9]{10,15}$/, "Mobile number must be 10 to 15 digits"],
+      index: true,
+    },
     profilePic: {
       type: String,
-      default: "", // Default profile pic
+      default: "",
     },
     role: {
       type: String,
@@ -36,7 +43,7 @@ const userSchema = new mongoose.Schema(
     },
     verified: {
       type: Boolean,
-      default: false, // Users are not verified by default
+      default: false,
     },
     createdAt: {
       type: Date,
