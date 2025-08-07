@@ -132,7 +132,7 @@ const Home = () => {
             {heroSubtitle}
           </p>
           <Link
-            to="/register"
+            to="/login"
             className="inline-flex items-center gap-2 sm:gap-3 bg-coral-500 text-ivory-50 px-5 py-2 sm:px-6 sm:py-3 md:px-7 md:py-3 lg:px-8 lg:py-4 rounded-full text-sm sm:text-base md:text-lg font-semibold hover:bg-coral-600 transition-all duration-300 shadow-lg bg-amber-200"
           >
             <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 " />
