@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-import { User, Mail, Lock, Loader, AlertCircle, MapPin } from "lucide-react";
+import { User, Mail, Lock, Loader, AlertCircle, MapPin, Phone } from "lucide-react";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -9,7 +9,8 @@ const Register = () => {
     name: "",
     email: "",
     password: "",
-    city: "", // Added city field
+    city: "",
+    mobile: "",
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,7 +55,6 @@ const Register = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl flex flex-col lg:flex-row">
-        {/* Illustration Section - Hidden on Mobile */}
         <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-emerald-600 to-green-700 p-12 text-white">
           <div className="h-full flex flex-col justify-center">
             <h1 className="text-4xl font-bold mb-6">Join Our Community!</h1>
@@ -72,10 +72,8 @@ const Register = () => {
           </div>
         </div>
 
-        {/* Form Section */}
         <div className="lg:w-1/2 p-8 lg:p-12">
           <div className="max-w-md mx-auto">
-            {/* Mobile Header */}
             <div className="lg:hidden text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">wholesalebaba</h1>
               <p className="text-gray-500">Create your account</p>
@@ -171,6 +169,26 @@ const Register = () => {
                     value={formData.city}
                     onChange={handleChange}
                     required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mobile Number
+                </label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                  <input
+                    type="tel"
+                    name="mobile"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
+                    placeholder="+1234567890"
+                    value={formData.mobile}
+                    onChange={handleChange}
+                    required
+                    pattern="[0-9]{10,15}"
+                    title="Mobile number should be 10 to 15 digits"
                   />
                 </div>
               </div>
