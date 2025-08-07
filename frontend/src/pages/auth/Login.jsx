@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Mail, Lock, Loader } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -8,6 +8,7 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -27,14 +28,12 @@ const Login = () => {
         const data = JSON.parse(text);
         if (!response.ok) throw new Error(data.message || "Login failed");
   
-        // ✅ Store user details in localStorage
         localStorage.setItem("token", data.token);
         localStorage.setItem("userRole", data.role);
-        localStorage.setItem("userId", data.userId); // Store userId for future use
-        // set username for future use
+        localStorage.setItem("userId", data.userId);
         localStorage.setItem("userName", data.name);
   
-        navigate("/mens"); // Redirect after successful login
+        navigate("/mens");
       } catch (parseError) {
         throw new Error(text || "Invalid response from server");
       }
@@ -44,12 +43,10 @@ const Login = () => {
       setLoading(false);
     }
   };
-  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl flex flex-col lg:flex-row">
-        {/* Illustration Section - Hidden on mobile */}
         <div className="hidden lg:block lg:w-1/2 bg-gradient-to-br from-blue-600 to-indigo-700 p-12 text-white">
           <div className="h-full flex flex-col justify-center">
             <h1 className="text-4xl font-bold mb-6">Welcome Back!</h1>
@@ -67,10 +64,8 @@ const Login = () => {
           </div>
         </div>
 
-        {/* Form Section */}
         <div className="lg:w-1/2 p-8 lg:p-12">
           <div className="max-w-md mx-auto">
-            {/* Mobile Header */}
             <div className="lg:hidden text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">wholesalebaba</h1>
               <p className="text-gray-500">Sign in to continue</p>
@@ -113,13 +108,20 @@ const Login = () => {
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                   <input
-                    type="password"
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    type={showPassword ? "text" : "password"}
+                    className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
                 </div>
               </div>
 
@@ -145,9 +147,9 @@ const Login = () => {
                 Don't have an account?{" "}
                 <Link
                   to="/register"
-                  className="text-blue-600 font-semibold hover:underline hover:text-blue-700 transition-all"
+                  className="text-blue-600 font-bold text-lg animate-pulse hover:text-blue-700 transition-all"
                 >
-                  Create Account
+                  New User
                 </Link>
               </p>
               <Link
