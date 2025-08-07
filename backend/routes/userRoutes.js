@@ -74,11 +74,16 @@ router.post("/api/auth/login", async (req, res) => {
 // ✅ Register User (Optimized)
 router.post("/api/auth/register", async (req, res) => {
   try {
-    const { name, email, password, city } = req.body;
+    const { name, email, password, city, mobile } = req.body;
 
     // Validate required fields
-    if (!name || !email || !password || !city) {
-      return res.status(400).json({ message: "All fields (name, email, password, city) are required" });
+    if (!name || !email || !password || !city || !mobile) {
+      return res.status(400).json({ message: "All fields (name, email, password, city, mobile) are required" });
+    }
+
+    // Validate mobile number format (basic check for 10-15 digits)
+    if (!/^[0-9]{10,15}$/.test(mobile)) {
+      return res.status(400).json({ message: "Mobile number must be 10 to 15 digits" });
     }
 
     // Optimized existence check with lean()
@@ -95,7 +100,8 @@ router.post("/api/auth/register", async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      city, // Include the city field
+      city,
+      mobile,
     });
 
     // Respond with minimal data (avoid sending sensitive info like password)
@@ -106,6 +112,7 @@ router.post("/api/auth/register", async (req, res) => {
         name: newUser.name,
         email: newUser.email,
         city: newUser.city,
+        mobile: newUser.mobile,
         role: newUser.role,
         createdAt: newUser.createdAt,
       },
